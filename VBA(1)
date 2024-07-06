@@ -1,0 +1,67 @@
+Sub OpenEdgeAndTakeScreenshots()
+    Dim edgePath As String
+    Dim url As String
+    Dim psScript As String
+    Dim searchTerm As String
+    Dim windowTitle As String
+    Dim i As Integer
+    Dim ws As Worksheet
+
+    ' Set the worksheet
+    Set ws = ThisWorkbook.Sheets(1)  ' Assuming the names are in the first sheet
+
+    ' Path to Microsoft Edge
+    edgePath = """C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"""
+
+    ' Folder to save screenshots
+    Dim screenshotFolder As String
+    screenshotFolder = "C:\Screenshots\"
+    ' Ensure the folder exists
+    If Dir(screenshotFolder, vbDirectory) = "" Then
+        MkDir screenshotFolder
+    End If
+
+    ' Loop through cells A1 to A10 for names
+    For i = 1 To 10
+        searchTerm = ws.Cells(i, 1).Value  ' Read the search term from column 1
+        If Trim(searchTerm) = "" Then Exit For  ' Skip empty cells
+
+        ' Construct the URL for Google search
+        url = "https://www.google.com/search?q=" & Replace(searchTerm, " ", "+")
+
+        ' Start Edge maximized and navigate to the URL
+        Shell edgePath & " --start-maximized --new-window " & url, vbNormalFocus
+        
+        ' Wait for Edge to load
+        Application.Wait (Now + TimeValue("0:00:05"))
+        
+        ' Construct the window title based on the search term
+        windowTitle = searchTerm & " - Google Search"
+
+        ' Try to activate the Edge window by exact title
+        On Error Resume Next
+        AppActivate windowTitle
+        If Err.Number <> 0 Then
+            MsgBox "Failed to activate Edge window. Error: " & Err.Description
+            Exit Sub
+        End If
+        On Error GoTo 0
+
+        ' PowerShell script to take a screenshot, ensuring it runs hidden
+        psScript = "powershell -windowstyle hidden -Command ""Add-Type -AssemblyName System.Windows.Forms; " & _
+                   "Add-Type -AssemblyName System.Drawing; " & _
+                   "$bounds = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds; " & _
+                   "$bitmap = New-Object System.Drawing.Bitmap $bounds.Width, $bounds.Height; " & _
+                   "$graphics = [System.Drawing.Graphics]::FromImage($bitmap); " & _
+                   "$graphics.CopyFromScreen($bounds.Location, [System.Drawing.Point]::Empty, $bounds.Size); " & _
+                   "$bitmap.Save('" & screenshotFolder & "screenshot_" & Replace(searchTerm, " ", "_") & ".png', [System.Drawing.Imaging.ImageFormat]::Png); " & _
+                   "$graphics.Dispose(); " & _
+                   "$bitmap.Dispose();"" "
+
+        ' Run PowerShell script without showing the PowerShell window
+        Shell psScript, vbHide
+
+        ' Optional: pause between searches
+        Application.Wait (Now + TimeValue("0:00:05"))
+    Next i
+End Sub
