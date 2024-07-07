@@ -1,3 +1,9 @@
+Declare PtrSafe Sub keybd_event Lib "user32" (ByVal bVk As Byte, ByVal bScan As Byte, ByVal dwFlags As Long, ByVal dwExtraInfo As Long)
+Const VK_MENU As Byte = &H12
+Const VK_F4 As Byte = &H73
+Const VK_F11 As Byte = &H7A
+Const KEYEVENTF_KEYUP As Long = &H2
+
 Private Declare PtrSafe Function BitBlt Lib "gdi32" (ByVal hDestDC As LongPtr, ByVal x As Long, ByVal y As Long, ByVal nWidth As Long, ByVal nHeight As Long, ByVal hSrcDC As LongPtr, ByVal xSrc As Long, ByVal ySrc As Long, ByVal dwRop As Long) As Long
 Private Declare PtrSafe Function CreateCompatibleBitmap Lib "gdi32" (ByVal hdc As LongPtr, ByVal nWidth As Long, ByVal nHeight As Long) As LongPtr
 Private Declare PtrSafe Function CreateCompatibleDC Lib "gdi32" (ByVal hdc As LongPtr) As LongPtr
@@ -30,21 +36,21 @@ End Type
 Private Const SRCCOPY As Long = &HCC0020
 Private Const CAPTUREBLT As Long = &H40000000
 
-Private Declare PtrSafe Sub keybd_event Lib "user32" (ByVal bVk As Byte, ByVal bScan As Byte, ByVal dwFlags As Long, ByVal dwExtraInfo As Long)
-Private Const VK_F11 As Byte = &H7A
-Private Const VK_MENU As Byte = &H12
-Private Const VK_F4 As Byte = &H73
-Private Const KEYEVENTF_KEYUP As Long = &H2
-
 Sub SendF11Key()
+    ' Send F11 key down
     keybd_event VK_F11, 0, 0, 0
+    ' Release F11 key
     keybd_event VK_F11, 0, KEYEVENTF_KEYUP, 0
 End Sub
 
 Sub SendAltF4Key()
+    ' Send Alt key down
     keybd_event VK_MENU, 0, 0, 0
+    ' Send F4 key down
     keybd_event VK_F4, 0, 0, 0
+    ' Release F4 key
     keybd_event VK_F4, 0, KEYEVENTF_KEYUP, 0
+    ' Release Alt key
     keybd_event VK_MENU, 0, KEYEVENTF_KEYUP, 0
 End Sub
 
@@ -102,45 +108,61 @@ Sub CaptureScreenshot(savePath As String)
     GdiplusShutdown gToken
 End Sub
 
-Sub clickImFeelingLuckyAndTakeScreenshot()
-    ' Initialize the browser instance
+Sub searchAndCaptureScreenshots()
+    ' Define variables
     Dim chrome As New CDPBrowser
-    chrome.start reAttach:=False
+    Dim excelPath As String
+    Dim wb As Workbook
+    Dim ws As Worksheet
+    Dim lastRow As Long
+    Dim i As Long
+    Dim searchName As String
+    Dim screenshotPath As String
+
+    ' Define the path to the Excel file
+    excelPath = "C:\Users\DELL\Desktop\Book1.xlsx"
+
+    ' Open the Excel file
+    Set wb = Workbooks.Open(excelPath)
+    Set ws = wb.Sheets(1)
+
+    ' Find the last row with data
+    lastRow = ws.Cells(ws.Rows.Count, "A").End(xlUp).row
+
+    ' Start Chrome
+    chrome.start
     chrome.show
     
-    ' Send F11 key to maximize the window
+    ' Maximize the browser window using F11 key
     Application.wait (Now + TimeValue("0:00:02")) ' Wait for the browser to open
     SendF11Key
     Application.wait (Now + TimeValue("0:00:02")) ' Wait for the browser to maximize
+    
+    ' Loop through each name in the Excel file
+    For i = 1 To lastRow
+        ' Get the search name
+        searchName = ws.Cells(i, 1).value
 
-    ' Navigate to Google's homepage
-    chrome.navigate "https://www.google.com"
-    
-    ' Wait for the page to load completely
-    chrome.wait
-    
-    ' Retrieve the "I'm Feeling Lucky" button using its class name and click it
-    Dim feelingLuckyButton As CDPElement
-    Set feelingLuckyButton = chrome.getElementByQuery("input.RNmpXc[name='btnI']")
-    feelingLuckyButton.click
-    
-    ' Optionally, wait for a few seconds to see the result
-    Application.wait (Now + TimeValue("0:00:05"))
-    
-    ' Take a screenshot
-    CaptureScreenshot "C:\Screenshots\screenshot.png"
-    
-    ' Wait for 5 seconds
-    Application.wait (Now + TimeValue("0:00:05"))
-    
+        ' Navigate to Google
+        chrome.navigate "https://www.google.com"
+        chrome.getElementByQuery("[name='q']").value = searchName
+        chrome.getElementByQuery("[name='q']").submit
+
+        ' Wait for the results to load (alternative method)
+        Application.wait Now + TimeValue("00:00:05")
+
+        ' Take a screenshot of the entire page
+        screenshotPath = "C:\Screenshots\" & searchName & ".png"
+        CaptureScreenshot screenshotPath
+
+        ' Optionally, add a delay to avoid overwhelming Google with requests
+        Application.wait Now + TimeValue("00:00:05")
+    Next i
+
     ' Close the browser using Alt+F4
     SendAltF4Key
-    
-    ' Quit CDP session
-    chrome.quit
-End Sub
 
-Sub TestClickAndScreenshot()
-    clickImFeelingLuckyAndTakeScreenshot
+    ' Close the Excel file without saving
+    wb.Close False
 End Sub
 
