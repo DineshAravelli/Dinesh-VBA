@@ -1,0 +1,197 @@
+Private Declare PtrSafe Sub keybd_event Lib "user32" (ByVal bVk As Byte, ByVal bScan As Byte, ByVal dwFlags As Long, ByVal dwExtraInfo As Long)
+Const VK_MENU As Byte = &H12
+Const VK_F4 As Byte = &H73
+Const VK_F11 As Byte = &H7A
+Const KEYEVENTF_KEYUP As Long = &H2
+
+Private Declare PtrSafe Function BitBlt Lib "gdi32" (ByVal hDestDC As LongPtr, ByVal x As Long, ByVal y As Long, ByVal nWidth As Long, ByVal nHeight As Long, ByVal hSrcDC As LongPtr, ByVal xSrc As Long, ByVal ySrc As Long, ByVal dwRop As Long) As Long
+Private Declare PtrSafe Function CreateCompatibleBitmap Lib "gdi32" (ByVal hdc As LongPtr, ByVal nWidth As Long, ByVal nHeight As Long) As LongPtr
+Private Declare PtrSafe Function CreateCompatibleDC Lib "gdi32" (ByVal hdc As LongPtr) As LongPtr
+Private Declare PtrSafe Function DeleteDC Lib "gdi32" (ByVal hdc As LongPtr) As Long
+Private Declare PtrSafe Function DeleteObject Lib "gdi32" (ByVal hObject As LongPtr) As Long
+Private Declare PtrSafe Function GetDeviceCaps Lib "gdi32" (ByVal hdc As LongPtr, ByVal nIndex As Long) As Long
+Private Declare PtrSafe Function GetDC Lib "user32" (ByVal hWnd As LongPtr) As LongPtr
+Private Declare PtrSafe Function ReleaseDC Lib "user32" (ByVal hWnd As LongPtr, ByVal hdc As LongPtr) As Long
+Private Declare PtrSafe Function SelectObject Lib "gdi32" (ByVal hdc As LongPtr, ByVal hObject As LongPtr) As LongPtr
+Private Declare PtrSafe Function GdipCreateBitmapFromHBITMAP Lib "gdiplus" (ByVal hbm As LongPtr, ByVal hPal As LongPtr, ByRef Bitmap As LongPtr) As Long
+Private Declare PtrSafe Function GdipSaveImageToFile Lib "gdiplus" (ByVal Image As LongPtr, ByVal Filename As LongPtr, ByRef ClsidEncoder As GdiplusUUID, ByVal EncoderParams As LongPtr) As Long
+Private Declare PtrSafe Function GdiplusStartup Lib "gdiplus" (ByRef Token As LongPtr, ByRef InputBuf As GdiplusStartupInput, ByVal OutputBuf As LongPtr) As Long
+Private Declare PtrSafe Function GdiplusShutdown Lib "gdiplus" (ByVal Token As LongPtr) As Long
+Private Declare PtrSafe Function CLSIDFromString Lib "ole32" (ByVal lpsz As LongPtr, ByRef pclsid As GdiplusUUID) As Long
+
+Private Type GdiplusStartupInput
+    GdiplusVersion As Long
+    DebugEventCallback As LongPtr
+    SuppressBackgroundThread As Long
+    SuppressExternalCodecs As Long
+End Type
+
+Private Type GdiplusUUID
+    Data1 As Long
+    Data2 As Integer
+    Data3 As Integer
+    Data4(0 To 7) As Byte
+End Type
+
+Private Const SRCCOPY As Long = &HCC0020
+Private Const CAPTUREBLT As Long = &H40000000
+
+Sub SendF11Key()
+    ' Send F11 key down
+    keybd_event VK_F11, 0, 0, 0
+    ' Release F11 key
+    keybd_event VK_F11, 0, KEYEVENTF_KEYUP, 0
+End Sub
+
+Sub SendAltF4Key()
+    ' Send Alt key down
+    keybd_event VK_MENU, 0, 0, 0
+    ' Send F4 key down
+    keybd_event VK_F4, 0, 0, 0
+    ' Release F4 key
+    keybd_event VK_F4, 0, KEYEVENTF_KEYUP, 0
+    ' Release Alt key
+    keybd_event VK_MENU, 0, KEYEVENTF_KEYUP, 0
+End Sub
+
+Sub CaptureScreenshot(savePath As String)
+    Dim screenDC As LongPtr
+    Dim memDC As LongPtr
+    Dim hBmp As LongPtr
+    Dim hOldBmp As LongPtr
+    Dim width As Long
+    Dim height As Long
+    Dim gToken As LongPtr
+    Dim gInput As GdiplusStartupInput
+    Dim Bitmap As LongPtr
+    Dim ClsidEncoder As GdiplusUUID
+    
+    ' Initialize GDI+
+    gInput.GdiplusVersion = 1
+    GdiplusStartup gToken, gInput, 0
+
+    ' Get the desktop device context
+    screenDC = GetDC(0)
+    
+    ' Create a memory device context compatible with the screen
+    memDC = CreateCompatibleDC(screenDC)
+    
+    ' Get screen width and height
+    width = GetDeviceCaps(screenDC, 8) ' 8 is for HORZRES
+    height = GetDeviceCaps(screenDC, 10) ' 10 is for VERTRES
+    
+    ' Create a compatible bitmap for the screen
+    hBmp = CreateCompatibleBitmap(screenDC, width, height)
+    
+    ' Select the compatible bitmap into the memory DC
+    hOldBmp = SelectObject(memDC, hBmp)
+    
+    ' BitBlt screen to memory DC
+    BitBlt memDC, 0, 0, width, height, screenDC, 0, 0, SRCCOPY Or CAPTUREBLT
+    
+    ' Create GDI+ bitmap from HBITMAP
+    GdipCreateBitmapFromHBITMAP hBmp, 0, Bitmap
+    
+    ' Get encoder CLSID
+    CLSIDFromString StrPtr("{557CF406-1A04-11D3-9A73-0000F81EF32E}"), ClsidEncoder ' PNG encoder CLSID
+    
+    ' Save bitmap to file
+    GdipSaveImageToFile Bitmap, StrPtr(savePath), ClsidEncoder, 0
+    
+    ' Cleanup
+    SelectObject memDC, hOldBmp
+    DeleteObject hBmp
+    DeleteDC memDC
+    ReleaseDC 0, screenDC
+    
+    ' Shutdown GDI+
+    GdiplusShutdown gToken
+End Sub
+
+Sub searchAndCaptureScreenshots()
+    ' Define variables
+    Dim chrome As New CDPBrowser
+    Dim excelPath As String
+    Dim wb As Workbook
+    Dim ws As Worksheet
+    Dim lastRow As Long
+    Dim i As Long
+    Dim searchName As String
+    Dim screenshotPath As String
+    Dim pdfPath As String
+
+    ' Define the path to the Excel file
+    excelPath = "C:\Users\DELL\Desktop\Book1.xlsx"
+
+    ' Open the Excel file
+    Set wb = Workbooks.Open(excelPath)
+    Set ws = wb.Sheets(1)
+
+    ' Find the last row with data
+    lastRow = ws.Cells(ws.Rows.Count, "A").End(xlUp).Row
+
+    ' Start Chrome
+    chrome.start
+    chrome.show
+    
+    ' Maximize the browser window using F11 key
+    Application.wait (Now + TimeValue("0:00:02")) ' Wait for the browser to open
+    SendF11Key
+    Application.wait (Now + TimeValue("0:00:02")) ' Wait for the browser to maximize
+    
+    ' Loop through each name in the Excel file
+    For i = 1 To lastRow
+        ' Get the search name
+        searchName = ws.Cells(i, 1).value
+
+        ' Navigate to Google
+        chrome.navigate "https://www.google.com"
+        chrome.getElementByQuery("[name='q']").value = searchName
+        chrome.getElementByQuery("[name='q']").submit
+
+        ' Wait for the results to load (alternative method)
+        Application.wait Now + TimeValue("00:00:05")
+
+        ' Take a screenshot of the entire page
+        screenshotPath = "C:\Screenshots\" & searchName & ".png"
+        CaptureScreenshot screenshotPath
+
+        ' Convert screenshot to PDF
+        pdfPath = "C:\Screenshots\" & searchName & ".pdf"
+        ConvertScreenshotToPDF screenshotPath, pdfPath
+
+        ' Delete the screenshot
+        Kill screenshotPath
+
+        ' Optionally, add a delay to avoid overwhelming Google with requests
+        Application.wait Now + TimeValue("00:00:05")
+    Next i
+
+    ' Close the browser using Alt+F4
+    SendAltF4Key
+End Sub
+
+Sub ConvertScreenshotToPDF(imagePath As String, pdfPath As String)
+    Dim wdApp As Object
+    Dim wdDoc As Object
+    
+    ' Create a new Word application
+    Set wdApp = CreateObject("Word.Application")
+    Set wdDoc = wdApp.Documents.Add
+    
+    ' Add image to Word document
+    wdDoc.InlineShapes.AddPicture imagePath
+    ' Save the document as PDF
+    wdDoc.SaveAs2 pdfPath, 17 ' 17 = wdFormatPDF
+    wdDoc.Close False
+    wdApp.quit
+    
+    ' Clean up
+    Set wdDoc = Nothing
+    Set wdApp = Nothing
+End Sub
+
+Sub TestSearchAndCapture()
+    searchAndCaptureScreenshots
+End Sub
+
