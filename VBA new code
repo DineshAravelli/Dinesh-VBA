@@ -1,0 +1,47 @@
+Sub GenerateNames()
+    Dim ws As Worksheet
+    Dim checkCell As Range
+    Dim numberCell As Range
+    Dim nameRange As Range
+    Dim numberOfNames As Integer
+    Dim matchedNumber As Integer
+    Dim lastRow As Long
+    Dim i As Long
+
+    ' Set your worksheet
+    Set ws = ThisWorkbook.Sheets("Sheet1") ' Change "Sheet1" to your sheet's name
+
+    ' Set the cell to check for "yes/no" and the cell with the number
+    Set checkCell = ws.Range("A1") ' Change this to the cell where you have "yes/no"
+    Set numberCell = ws.Range("B1") ' Change this to the cell where you have the number to check
+    matchedNumber = 5 ' Set this to the number you want to match
+
+    ' Check if the cell contains "yes"
+    If LCase(checkCell.Value) = "yes" Then
+        ' Get the number from the specified cell
+        numberOfNames = numberCell.Value
+
+        ' Check if the number matches the given number
+        If numberOfNames = matchedNumber Then
+            ' Find the last row with data in column C (names)
+            lastRow = ws.Cells(ws.Rows.Count, "C").End(xlUp).Row
+
+            ' Set the range for the names
+            Set nameRange = ws.Range("C2:C" & lastRow) ' Assuming names start from C2 downwards
+
+            ' Process names if they match the given number
+            If nameRange.Cells.Count = matchedNumber Then
+                For i = 1 To nameRange.Cells.Count
+                    Debug.Print nameRange.Cells(i, 1).Value ' Do whatever processing you need with the names
+                Next i
+                MsgBox "Names processed successfully!"
+            Else
+                MsgBox "The number of names does not match the given number."
+            End If
+        Else
+            MsgBox "The number does not match the given number."
+        End If
+    Else
+        MsgBox "The check cell does not contain 'yes'."
+    End If
+End Sub
