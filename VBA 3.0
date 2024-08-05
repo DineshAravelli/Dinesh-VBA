@@ -11,6 +11,7 @@ Sub UploadDataToSharePoint()
     
     ' Open Excel file and select worksheet
     Dim xlApp As Excel.Application
+    On Error GoTo ErrHandler
     Set xlApp = New Excel.Application
     xlApp.Visible = False
     Dim xlWorkbook As Excel.Workbook
@@ -27,7 +28,7 @@ Sub UploadDataToSharePoint()
     formDigestValue = GetFormDigest(SHAREPOINT_SITE_URL)
     If formDigestValue = "" Then
         MsgBox "Failed to get form digest value"
-        Exit Sub
+        GoTo CleanUp
     End If
     
     ' Prepare JSON body for each row of data and upload to SharePoint
@@ -54,20 +55,23 @@ Sub UploadDataToSharePoint()
             
             If .Status <> 201 Then
                 MsgBox "Error: " & .Status & " - " & .statusText & vbCrLf & "Response: " & .responseText
-                xlWorkbook.Close False
-                xlApp.Quit
-                Set xlApp = Nothing
-                Exit Sub
+                GoTo CleanUp
             End If
         End With
     Next i
     
     MsgBox "Data uploaded successfully!"
     
+CleanUp:
     ' Clean up
     xlWorkbook.Close False
     xlApp.Quit
     Set xlApp = Nothing
+    Exit Sub
+
+ErrHandler:
+    MsgBox "An error occurred: " & Err.Description
+    GoTo CleanUp
 End Sub
 
 Function GetFormDigest(siteUrl As String) As String
