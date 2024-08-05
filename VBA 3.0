@@ -1,0 +1,88 @@
+Sub UploadDataToSharePoint()
+    ' Constants
+    Const SHAREPOINT_SITE_URL As String = "https://sharepoint3.bankofamerica.com/sites/GBS_GCAAO_AML_Onboarding/F_O_Give_Up_agreement"
+    Const SHAREPOINT_LIST_NAME As String = "example"
+    Const EXCEL_FILE_PATH As String = "C:\Path\To\Your\Excel\File.xlsx"
+    Const EXCEL_WORKSHEET_NAME As String = "Sheet1"
+
+    ' Create MSXML2 XMLHTTP object
+    Dim xmlHttp As Object
+    Set xmlHttp = CreateObject("MSXML2.ServerXMLHTTP.6.0")
+    
+    ' Open Excel file and select worksheet
+    Dim xlApp As Excel.Application
+    Set xlApp = New Excel.Application
+    xlApp.Visible = False
+    Dim xlWorkbook As Excel.Workbook
+    Set xlWorkbook = xlApp.Workbooks.Open(EXCEL_FILE_PATH)
+    Dim xlWorksheet As Excel.Worksheet
+    Set xlWorksheet = xlWorkbook.Sheets(EXCEL_WORKSHEET_NAME)
+    
+    ' Get data from Excel worksheet
+    Dim data As Variant
+    data = xlWorksheet.UsedRange.Value
+    
+    ' Get form digest value
+    Dim formDigestValue As String
+    formDigestValue = GetFormDigest(SHAREPOINT_SITE_URL)
+    If formDigestValue = "" Then
+        MsgBox "Failed to get form digest value"
+        Exit Sub
+    End If
+    
+    ' Prepare JSON body for each row of data and upload to SharePoint
+    Dim jsonBody As String
+    Dim i As Long, j As Long
+    For i = 2 To UBound(data, 1)
+        Dim jsonObject As Object
+        Set jsonObject = CreateObject("Scripting.Dictionary")
+        jsonObject.Add "__metadata", CreateObject("Scripting.Dictionary")
+        jsonObject("__metadata").Add "type", "SP.Data." & SHAREPOINT_LIST_NAME & "ListItem"
+        
+        For j = 1 To UBound(data, 2)
+            jsonObject.Add xlWorksheet.Cells(1, j).Value, data(i, j)
+        Next j
+        
+        jsonBody = JsonConverter.ConvertToJson(jsonObject)
+        
+        With xmlHttp
+            .Open "POST", SHAREPOINT_SITE_URL & "/_api/web/lists/GetByTitle('" & SHAREPOINT_LIST_NAME & "')/items", False
+            .setRequestHeader "Content-Type", "application/json;odata=verbose"
+            .setRequestHeader "Accept", "application/json;odata=verbose"
+            .setRequestHeader "X-RequestDigest", formDigestValue
+            .Send jsonBody
+            
+            If .Status <> 201 Then
+                MsgBox "Error: " & .Status & " - " & .statusText & vbCrLf & "Response: " & .responseText
+                xlWorkbook.Close False
+                xlApp.Quit
+                Set xlApp = Nothing
+                Exit Sub
+            End If
+        End With
+    Next i
+    
+    MsgBox "Data uploaded successfully!"
+    
+    ' Clean up
+    xlWorkbook.Close False
+    xlApp.Quit
+    Set xlApp = Nothing
+End Sub
+
+Function GetFormDigest(siteUrl As String) As String
+    Dim xmlHttp As Object
+    Set xmlHttp = CreateObject("MSXML2.ServerXMLHTTP.6.0")
+    xmlHttp.Open "POST", siteUrl & "/_api/contextinfo", False
+    xmlHttp.setRequestHeader "Accept", "application/json;odata=verbose"
+    xmlHttp.Send
+    
+    If xmlHttp.Status = 200 Then
+        Dim response As Object
+        Set response = JsonConverter.ParseJson(xmlHttp.responseText)
+        GetFormDigest = response("d")("GetContextWebInformation")("FormDigestValue")
+    Else
+        MsgBox "Failed to get Form Digest: " & xmlHttp.Status & " - " & xmlHttp.StatusText & vbCrLf & "Response: " & xmlHttp.responseText
+        GetFormDigest = ""
+    End If
+End Function
