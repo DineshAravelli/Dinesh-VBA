@@ -1,91 +1,45 @@
-Sub GenerateAssignmentCounts()
-    Dim wsData As Worksheet
-    Dim wsOutput As Worksheet
+Sub ExtractAgreementID()
+    Dim ie As Object
+    Dim doc As Object
+    Dim agreementID As String
+    Dim url As String
+    Dim ws As Worksheet
     Dim lastRow As Long
-    Dim assignCounts As Object, gmiCounts As Object, reasonCounts As Object
-    Dim cell As Range
-    Dim rowOutput As Long
     
-    ' Set worksheets
-    Set wsData = ThisWorkbook.Sheets("AssignedData") ' Sheet with the data
-    Set wsOutput = ThisWorkbook.Sheets("Database") ' Sheet where the output will be written
+    ' Define the URL
+    url = "https://myapps.fia-tech.com/Docs/#/agreement-view/906725" ' Change this URL if needed
     
-    ' Find the last row in the AssignedData sheet
-    lastRow = wsData.Cells(wsData.Rows.Count, "A").End(xlUp).Row
+    ' Create a new Internet Explorer instance (or Edge in IE mode)
+    Set ie = CreateObject("InternetExplorer.Application")
     
-    ' Create dictionaries to store unique counts
-    Set assignCounts = CreateObject("Scripting.Dictionary")
-    Set gmiCounts = CreateObject("Scripting.Dictionary")
-    Set reasonCounts = CreateObject("Scripting.Dictionary")
+    ' Set IE properties
+    ie.Visible = False ' Set to True if you want to see the browser during execution
+    ie.Navigate url
     
-    ' Loop through each row in the data sheet
-    For Each cell In wsData.Range("D2:D" & lastRow) ' D column = "ASSIGN" column
-        ' Get values for each of the columns
-        Dim assignPerson As String, gmiCustomer As String, reasonCode As String
-        assignPerson = wsData.Cells(cell.Row, 10).Value ' "ASSIGN" column (column J)
-        gmiCustomer = wsData.Cells(cell.Row, 3).Value ' "GMI CUSTOMER" column (column C)
-        reasonCode = wsData.Cells(cell.Row, 4).Value ' "REASONCODE" column (column D)
-        
-        ' Count for "ASSIGN"
-        If assignCounts.exists(assignPerson) Then
-            assignCounts(assignPerson) = assignCounts(assignPerson) + 1
-        Else
-            assignCounts.Add assignPerson, 1
-        End If
-        
-        ' Count for "GMI CUSTOMER"
-        If gmiCounts.exists(gmiCustomer) Then
-            gmiCounts(gmiCustomer) = gmiCounts(gmiCustomer) + 1
-        Else
-            gmiCounts.Add gmiCustomer, 1
-        End If
-        
-        ' Count for "REASONCODE"
-        If reasonCounts.exists(reasonCode) Then
-            reasonCounts(reasonCode) = reasonCounts(reasonCode) + 1
-        Else
-            reasonCounts.Add reasonCode, 1
-        End If
-    Next cell
+    ' Wait for the page to load completely
+    Do While ie.Busy Or ie.ReadyState <> 4
+        DoEvents
+    Loop
     
-    ' Write the results to the "Database" sheet starting from E15
+    ' Get the document object
+    Set doc = ie.Document
     
-    ' Output for "ASSIGN" column counts
-    rowOutput = 15
-    wsOutput.Cells(rowOutput, 5).Value = "ASSIGN Person"
-    wsOutput.Cells(rowOutput, 6).Value = "Unique Count"
-    rowOutput = rowOutput + 1
+    ' Scrape the Agreement ID (located in the HTML structure)
+    ' Modify this based on the actual HTML tag containing the Agreement ID
+    agreementID = doc.getElementsByClassName("agreement-id")(0).innerText
     
-    Dim key As Variant
-    For Each key In assignCounts.keys
-        wsOutput.Cells(rowOutput, 5).Value = key
-        wsOutput.Cells(rowOutput, 6).Value = assignCounts(key)
-        rowOutput = rowOutput + 1
-    Next key
+    ' Set the worksheet where you want to save the Agreement ID (change "Sheet1" as necessary)
+    Set ws = ThisWorkbook.Sheets("Sheet1")
     
-    ' Output for "GMI CUSTOMER" column counts
-    rowOutput = 15
-    wsOutput.Cells(rowOutput, 8).Value = "GMI CUSTOMER"
-    wsOutput.Cells(rowOutput, 9).Value = "Unique Count"
-    rowOutput = rowOutput + 1
+    ' Find the last row in column A to append the new Agreement ID
+    lastRow = ws.Cells(ws.Rows.Count, "A").End(xlUp).Row + 1
     
-    For Each key In gmiCounts.keys
-        wsOutput.Cells(rowOutput, 8).Value = key
-        wsOutput.Cells(rowOutput, 9).Value = gmiCounts(key)
-        rowOutput = rowOutput + 1
-    Next key
+    ' Write the Agreement ID to the next available row in column A
+    ws.Cells(lastRow, 1).Value = agreementID
     
-    ' Output for "REASONCODE" column counts
-    rowOutput = 15
-    wsOutput.Cells(rowOutput, 11).Value = "REASONCODE"
-    wsOutput.Cells(rowOutput, 12).Value = "Unique Count"
-    rowOutput = rowOutput + 1
+    ' Close Internet Explorer
+    ie.Quit
     
-    For Each key In reasonCounts.keys
-        wsOutput.Cells(rowOutput, 11).Value = key
-        wsOutput.Cells(rowOutput, 12).Value = reasonCounts(key)
-        rowOutput = rowOutput + 1
-    Next key
-    
-    MsgBox "Counts generated successfully.", vbInformation
+    ' Inform the user
+    MsgBox "Agreement ID " & agreementID & " has been saved to Excel.", vbInformation
 End Sub
