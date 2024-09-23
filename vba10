@@ -1,0 +1,55 @@
+Sub AssignGmiCustomersWithMemberSheet()
+    Dim wsData As Worksheet, wsMembers As Worksheet
+    Dim lastRow As Long, memberLastRow As Long
+    Dim rng As Range
+    Dim uniqueValues As Collection
+    Dim cell As Range
+    Dim memberAssignment() As String
+    Dim memberCounter As Integer
+    Dim i As Integer
+    
+    ' Set worksheets
+    Set wsData = ThisWorkbook.Sheets("Sheet1") ' Change "Sheet1" to your data sheet name
+    Set wsMembers = ThisWorkbook.Sheets("Sheet2") ' Change "Sheet2" to your member sheet name
+    
+    ' Find the last row in the data sheet and the member sheet
+    lastRow = wsData.Cells(wsData.Rows.Count, "B").End(xlUp).Row
+    memberLastRow = wsMembers.Cells(wsMembers.Rows.Count, "A").End(xlUp).Row
+    
+    ' Get members from the members sheet (Column A)
+    ReDim memberAssignment(1 To memberLastRow - 1) ' Adjust the array size to fit the number of members
+    For i = 1 To memberLastRow - 1
+        memberAssignment(i) = wsMembers.Cells(i + 1, 1).Value ' Adjust if members start from another row
+    Next i
+    
+    ' Set the range where GMI CUSTOMER is located (Column B)
+    Set rng = wsData.Range("B2:B" & lastRow)
+    
+    ' Get unique GMI CUSTOMER values
+    Set uniqueValues = New Collection
+    On Error Resume Next ' Ignore error for duplicates
+    For Each cell In rng
+        uniqueValues.Add cell.Value, CStr(cell.Value) ' Add unique values
+    Next cell
+    On Error GoTo 0 ' Reset error handling
+    
+    ' Loop through the unique GMI CUSTOMER values and assign them
+    memberCounter = 1 ' Start with the first member
+    
+    For i = 1 To uniqueValues.Count
+        ' Apply filter for current GMI CUSTOMER
+        wsData.Range("B1:B" & lastRow).AutoFilter Field:=2, Criteria1:=uniqueValues(i)
+        
+        ' Assign the visible (filtered) rows to a member
+        For Each cell In rng.SpecialCells(xlCellTypeVisible)
+            wsData.Cells(cell.Row, "G").Value = memberAssignment(memberCounter) ' Assign to member in column G
+        Next cell
+        
+        ' Move to the next member in a round-robin fashion
+        memberCounter = memberCounter + 1
+        If memberCounter > UBound(memberAssignment) Then memberCounter = 1 ' Reset to first member after last
+    Next i
+    
+    ' Clear the filter
+    wsData.AutoFilterMode = False
+End Sub
