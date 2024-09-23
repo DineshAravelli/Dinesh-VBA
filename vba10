@@ -1,30 +1,91 @@
-Sub ClearDataWithWarning()
-    Dim ws As Worksheet
+Sub GenerateAssignmentCounts()
+    Dim wsData As Worksheet
+    Dim wsOutput As Worksheet
     Dim lastRow As Long
-    Dim deleteCount As Long
-    Dim response As VbMsgBoxResult
+    Dim assignCounts As Object, gmiCounts As Object, reasonCounts As Object
+    Dim cell As Range
+    Dim rowOutput As Long
     
-    ' Set the worksheet (change "AssignedData" to your sheet name)
-    Set ws = ThisWorkbook.Sheets("AssignedData")
+    ' Set worksheets
+    Set wsData = ThisWorkbook.Sheets("AssignedData") ' Sheet with the data
+    Set wsOutput = ThisWorkbook.Sheets("Database") ' Sheet where the output will be written
     
-    ' Find the last row of data in column A (adjust if needed)
-    lastRow = ws.Cells(ws.Rows.Count, "A").End(xlUp).Row
+    ' Find the last row in the AssignedData sheet
+    lastRow = wsData.Cells(wsData.Rows.Count, "A").End(xlUp).Row
     
-    ' Ask for confirmation to clear the data
-    response = MsgBox("Are you sure you want to clear the data? This action cannot be undone.", vbYesNo + vbExclamation, "Clear Data Confirmation")
+    ' Create dictionaries to store unique counts
+    Set assignCounts = CreateObject("Scripting.Dictionary")
+    Set gmiCounts = CreateObject("Scripting.Dictionary")
+    Set reasonCounts = CreateObject("Scripting.Dictionary")
     
-    ' If the user selects "Yes", proceed with clearing the data
-    If response = vbYes Then
-        ' Clear the data (Assuming data starts from row 2, adjust as per your layout)
-        ws.Range("A2:L" & lastRow).ClearContents ' Adjust the range if needed
+    ' Loop through each row in the data sheet
+    For Each cell In wsData.Range("D2:D" & lastRow) ' D column = "ASSIGN" column
+        ' Get values for each of the columns
+        Dim assignPerson As String, gmiCustomer As String, reasonCode As String
+        assignPerson = wsData.Cells(cell.Row, 10).Value ' "ASSIGN" column (column J)
+        gmiCustomer = wsData.Cells(cell.Row, 3).Value ' "GMI CUSTOMER" column (column C)
+        reasonCode = wsData.Cells(cell.Row, 4).Value ' "REASONCODE" column (column D)
         
-        ' Calculate the number of rows cleared
-        deleteCount = lastRow - 1 ' Subtract 1 for the header row
+        ' Count for "ASSIGN"
+        If assignCounts.exists(assignPerson) Then
+            assignCounts(assignPerson) = assignCounts(assignPerson) + 1
+        Else
+            assignCounts.Add assignPerson, 1
+        End If
         
-        ' Display the number of rows cleared
-        MsgBox deleteCount & " rows of data have been cleared.", vbInformation, "Data Cleared"
-    Else
-        ' If the user selects "No", cancel the operation
-        MsgBox "Data clearing operation was canceled.", vbInformation, "Operation Canceled"
-    End If
+        ' Count for "GMI CUSTOMER"
+        If gmiCounts.exists(gmiCustomer) Then
+            gmiCounts(gmiCustomer) = gmiCounts(gmiCustomer) + 1
+        Else
+            gmiCounts.Add gmiCustomer, 1
+        End If
+        
+        ' Count for "REASONCODE"
+        If reasonCounts.exists(reasonCode) Then
+            reasonCounts(reasonCode) = reasonCounts(reasonCode) + 1
+        Else
+            reasonCounts.Add reasonCode, 1
+        End If
+    Next cell
+    
+    ' Write the results to the "Database" sheet starting from E15
+    
+    ' Output for "ASSIGN" column counts
+    rowOutput = 15
+    wsOutput.Cells(rowOutput, 5).Value = "ASSIGN Person"
+    wsOutput.Cells(rowOutput, 6).Value = "Unique Count"
+    rowOutput = rowOutput + 1
+    
+    Dim key As Variant
+    For Each key In assignCounts.keys
+        wsOutput.Cells(rowOutput, 5).Value = key
+        wsOutput.Cells(rowOutput, 6).Value = assignCounts(key)
+        rowOutput = rowOutput + 1
+    Next key
+    
+    ' Output for "GMI CUSTOMER" column counts
+    rowOutput = 15
+    wsOutput.Cells(rowOutput, 8).Value = "GMI CUSTOMER"
+    wsOutput.Cells(rowOutput, 9).Value = "Unique Count"
+    rowOutput = rowOutput + 1
+    
+    For Each key In gmiCounts.keys
+        wsOutput.Cells(rowOutput, 8).Value = key
+        wsOutput.Cells(rowOutput, 9).Value = gmiCounts(key)
+        rowOutput = rowOutput + 1
+    Next key
+    
+    ' Output for "REASONCODE" column counts
+    rowOutput = 15
+    wsOutput.Cells(rowOutput, 11).Value = "REASONCODE"
+    wsOutput.Cells(rowOutput, 12).Value = "Unique Count"
+    rowOutput = rowOutput + 1
+    
+    For Each key In reasonCounts.keys
+        wsOutput.Cells(rowOutput, 11).Value = key
+        wsOutput.Cells(rowOutput, 12).Value = reasonCounts(key)
+        rowOutput = rowOutput + 1
+    Next key
+    
+    MsgBox "Counts generated successfully.", vbInformation
 End Sub
