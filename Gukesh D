@@ -2,41 +2,29 @@ Option Explicit
 
 ' Windows API declarations for keyboard events and other required functions
 Private Declare PtrSafe Sub keybd_event Lib "user32" (ByVal bVk As Byte, ByVal bScan As Byte, ByVal dwFlags As Long, ByVal dwExtraInfo As Long)
-Private Declare PtrSafe Function FindWindowA Lib "user32" (ByVal lpClassName As String, ByVal lpWindowName As String) As LongPtr
+Private Declare PtrSafe Function FindWindow Lib "user32" Alias "FindWindowA" (ByVal lpClassName As String, ByVal lpWindowName As String) As LongPtr
 Private Declare PtrSafe Function SetForegroundWindow Lib "user32" (ByVal hwnd As LongPtr) As Long
-Private Declare PtrSafe Function ShowWindow Lib "user32" (ByVal hwnd As LongPtr, ByVal nCmdShow As Long) As Long
+Private Declare PtrSafe Function ShowWindow Lib "user32" (ByVal hwnd As LongPtr, ByVal nCmdShow As Long)
 Private Declare PtrSafe Sub Sleep Lib "kernel32" (ByVal dwMilliseconds As Long)
 
 ' Constants
 Private Const SW_MAXIMIZE As Long = 3
 Private Const VK_CONTROL As Byte = &H11
 Private Const VK_P As Byte = &H50
-Private Const VK_TAB As Byte = &H9
+Private Const VK_TAB As Byte = &H09
 Private Const VK_RETURN As Byte = &HD
 Private Const KEYEVENTF_KEYUP As Long = &H2
 
-Sub OpenChromeAndPrint()
-    Dim hwnd As LongPtr
-    Dim name As String
-    Dim downloadPath As String
+Sub SearchNamesAndPrint()
+    Dim wb As Workbook
     Dim ws As Worksheet
     Dim lastRow As Long
+    Dim searchName As String
     Dim i As Long
-    Dim xlApp As Object
-    Dim xlBook As Object
-    Dim filePath As String
+    Dim downloadPath As String
+    Dim hwnd As LongPtr
 
-    filePath = ThisWorkbook.FullName
-
-    ' Open the Excel file (.xlsm)
-    Set xlApp = CreateObject("Excel.Application")
-    Set xlBook = xlApp.Workbooks.Open(filePath)
-    Set ws = xlBook.Sheets(1) ' Assuming data is in the first sheet
-    
-    ' Find the last row with valid data in column A
-    lastRow = ws.Cells(ws.Rows.Count, "A").End(xlUp).Row
-
-    ' Define the download path where files will be saved
+    ' Define the download path where PDFs will be saved
     downloadPath = "C:\Screenshots"
 
     ' Ensure folder exists or create it
@@ -44,92 +32,90 @@ Sub OpenChromeAndPrint()
         MkDir downloadPath
     End If
 
-    ' Iterate through all names in column A
+    ' Open the workbook and worksheet
+    Set wb = Workbooks.Open("C:\Users\DELL\Desktop\ExcelVBA.xlsm")
+    Set ws = wb.Sheets(1) ' Assuming names are in the first sheet
+
+    ' Get the last row with data in column A
+    lastRow = ws.Cells(ws.Rows.Count, "A").End(xlUp).Row
+
+    ' Open Chrome if it is not already opened
+    hwnd = FindWindow("Chrome_WidgetWin_1", vbNullString)
+    
+    ' If Chrome is found, bring it to the foreground and maximize it
+    If hwnd <> 0 Then
+        ShowWindow hwnd, SW_MAXIMIZE
+        SetForegroundWindow hwnd
+        Sleep 2000 ' Wait for Chrome to be maximized
+    End If
+
+    ' Step 1: Perform a fake search to avoid restore session dialog
+    SendKeys "^t", True ' Open new tab
+    Sleep 1000
+    SendKeys "^l", True ' Focus address bar
+    Sleep 1000
+    SendKeys "https://www.google.com/search?q=person1", True ' Perform fake search
+    Sleep 1000
+    keybd_event VK_RETURN, 0, 0, 0 ' Press Enter to navigate
+    keybd_event VK_RETURN, 0, KEYEVENTF_KEYUP, 0
+    Sleep 5000 ' Wait for the fake page to load
+
+    ' Step 2: Close the fake tab
+    SendKeys "^w", True ' Close fake tab
+    Sleep 1000
+
+    ' Step 3: Loop through each real name in the Excel file
     For i = 1 To lastRow
-        name = ws.Cells(i, 1).Value
+        searchName = ws.Cells(i, 1).Value
+
+        ' Navigate to the URL using the real search name
+        SendKeys "^t", True ' Open new tab
+        Sleep 1000
+        SendKeys "^l", True ' Focus address bar
+        Sleep 1000
+        SendKeys "https://www.google.com/search?q=" & Replace(searchName, " ", "+"), True
+        Sleep 1000
+        keybd_event VK_RETURN, 0, 0, 0 ' Press Enter to navigate
+        keybd_event VK_RETURN, 0, KEYEVENTF_KEYUP, 0
+        Sleep 5000 ' Wait for the page to load
+
+        ' Simulate Tab key presses to navigate the website and hit Enter
+        keybd_event VK_TAB, 0, 0, 0 ' First Tab
+        keybd_event VK_TAB, 0, KEYEVENTF_KEYUP, 0
+        Sleep 1000
+        keybd_event VK_TAB, 0, 0, 0 ' Second Tab
+        keybd_event VK_TAB, 0, KEYEVENTF_KEYUP, 0
+        Sleep 1000
+        keybd_event VK_RETURN, 0, 0, 0 ' Press Enter to activate the highlighted button
+        keybd_event VK_RETURN, 0, KEYEVENTF_KEYUP, 0
+        Sleep 2000
+
+        ' Simulate Ctrl + P to open Print dialog
+        keybd_event VK_CONTROL, 0, 0, 0
+        keybd_event VK_P, 0, 0, 0
+        keybd_event VK_P, 0, KEYEVENTF_KEYUP, 0
+        keybd_event VK_CONTROL, 0, KEYEVENTF_KEYUP, 0
+        Sleep 3000 ' Allow time for the Print dialog to open
         
-        ' Open a new instance of Chrome
-        Shell "C:\Program Files (x86)\Google\Chrome\Application\chrome.exe", vbNormalFocus
-        Sleep 3000 ' Give Chrome time to start
-        
-        hwnd = FindWindowA("Chrome_WidgetWin_1", vbNullString)
-        If hwnd <> 0 Then
-            ' If Chrome is found, bring it to the foreground and maximize it
-            ShowWindow hwnd, SW_MAXIMIZE
-            SetForegroundWindow hwnd
-            Sleep 2000 ' Wait for Chrome to be maximized
-            
-            ' Navigate to Google search
-            SendKeys "^t", True ' Open a new tab and focus on the address bar
-            Sleep 2000
-            SendKeys "https://www.google.com/search?q=" & Replace(name, " ", "+"), True
-            Sleep 3000
-            keybd_event VK_RETURN, 0, 0, 0 ' Press Enter
-            keybd_event VK_RETURN, 0, KEYEVENTF_KEYUP, 0
-            Sleep 5000 ' Wait for the search results to load
-            
-            ' Simulate pressing Tab twice and Enter to submit the form
-            SimulateTabTabEnter
-            
-            Sleep 5000 ' Wait for the search results to load again
+        ' Press Enter to confirm Print dialog
+        keybd_event VK_RETURN, 0, 0, 0
+        keybd_event VK_RETURN, 0, KEYEVENTF_KEYUP, 0
+        Sleep 3000 ' Wait for Print dialog to process
 
-            ' Simulate Ctrl + P to open Print dialog
-            SimulateCtrlP
+        ' Simulate typing the file name and pressing Enter
+        SaveFileDialog downloadPath & "\" & Replace(searchName, " ", "_") & ".pdf"
 
-            Sleep 10000 ' Allow more time for the Print dialog to open
-
-            ' Handle the Save As dialog
-            SaveFileDialog downloadPath & "\" & Replace(name, " ", "-") & ".pdf"
-
-            ' Wait for the file to be saved
-            Sleep 7000
-            
-            ' Close Chrome after saving
-            Shell "taskkill /F /IM chrome.exe", vbHide
-            Sleep 3000 ' Give time for Chrome to close before moving to next name
-        Else
-            MsgBox "Chrome window not found."
-        End If
+        ' Wait for the file to be saved
+        Sleep 5000
     Next i
 
-    ' Close the Excel workbook
-    xlBook.Close False
-    xlApp.Quit
-
-    ' Clean up
-    Set xlBook = Nothing
-    Set xlApp = Nothing
-End Sub
-
-' Simulate Ctrl + P for the Print dialog
-Sub SimulateCtrlP()
-    keybd_event VK_CONTROL, 0, 0, 0
-    keybd_event VK_P, 0, 0, 0
-    keybd_event VK_P, 0, KEYEVENTF_KEYUP, 0
-    keybd_event VK_CONTROL, 0, KEYEVENTF_KEYUP, 0
-End Sub
-
-' Simulate pressing Tab twice and Enter to submit the form
-Sub SimulateTabTabEnter()
-    ' Simulate Tab key press
-    keybd_event VK_TAB, 0, 0, 0
-    keybd_event VK_TAB, 0, KEYEVENTF_KEYUP, 0
-    Sleep 500
-    
-    ' Simulate Tab key press again
-    keybd_event VK_TAB, 0, 0, 0
-    keybd_event VK_TAB, 0, KEYEVENTF_KEYUP, 0
-    Sleep 500
-    
-    ' Simulate Enter key press
-    keybd_event VK_RETURN, 0, 0, 0
-    keybd_event VK_RETURN, 0, KEYEVENTF_KEYUP, 0
+    MsgBox "All searches completed!"
 End Sub
 
 ' Handle Save As dialog to type the file name and press Enter
 Sub SaveFileDialog(fileName As String)
     ' Wait for the Save As dialog to appear
-    Sleep 5000 ' Increased delay for Save As dialog
+    Sleep 3000
     
     ' Type the filename into the dialog box
     SendKeys fileName, True
