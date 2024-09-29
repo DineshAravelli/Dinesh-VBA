@@ -1,0 +1,198 @@
+Sub Directors_Scrape()
+
+    ' Define variables
+    Dim chrome As New CDPBrowser
+    Dim excelPath As String
+    Dim wb As Workbook
+    Dim ws As Worksheet
+    Dim lastRow As Long
+    Dim i As Long
+    Dim searchName As String
+    Dim screenshotPath As String
+    Dim pdfPath As String
+    Dim name As Variant
+    Dim currentCell As Range
+    Dim names As Collection
+    Dim nameRange As Range
+    Dim lastCol As Long
+
+    '--------------------------------------
+    ' Chrome steps Start
+    '--------------------------------------
+
+    ' Start Chrome
+    chrome.start
+    chrome.show
+
+    ' Maximize the browser window using F11 key
+    Application.Wait (Now + TimeValue("00:00:01")) ' Wait for the browser to open
+    SendKeys "{F11}", True ' Maximize the window
+    Application.Wait (Now + TimeValue("00:00:01")) ' Wait for the browser to maximize
+
+    ' Loop through each name in the Excel file (Assume names are already loaded)
+    For Each name In names
+
+        searchName = name
+
+        ' Navigate to the OWLS page with the search query
+        chrome.navigate "https://47971ow-src-p.bankofamerica.com/owls?q=" & searchName
+
+        ' Input the search query into the text box and submit
+        chrome.getElementByQuery("[name='q']").value = searchName
+        chrome.getElementByQuery("[name='q']").submit
+
+        ' Wait for the results to load
+        Application.Wait Now + TimeValue("00:00:01")
+
+        ' Take a screenshot (Here we integrate the Ctrl + Shift + C step)
+        ' Simulate Ctrl + Shift + C to open Inspect Element (DevTools)
+        SimulateCtrlShiftC
+        Application.Wait Now + TimeValue("00:00:05") ' Wait for DevTools to open
+        
+        ' Simulate Ctrl + Shift + P to open the Command Palette
+        SimulateCtrlShiftP
+        Application.Wait Now + TimeValue("00:00:02") ' Wait for the Command Palette to open
+        
+        ' Type "Capture full size screenshot" in the command palette
+        SendKeys "capture full size screenshot", True
+        
+        ' Simulate pressing Enter to capture the screenshot
+        Application.Wait Now + TimeValue("00:00:02")
+        keybd_event VK_RETURN, 0, 0, 0
+        keybd_event VK_RETURN, 0, KEYEVENTF_KEYUP, 0
+        
+        ' Wait for the screenshot to be saved
+        Application.Wait Now + TimeValue("00:00:05")
+
+        ' Move the most recent downloaded file to the desired folder
+        MoveMostRecentDownload "C:\Screenshots\", searchName
+
+    Next name
+
+    ' Close the Chrome session
+    chrome.quit
+
+End Sub
+
+' Simulate Ctrl + Shift + C for Inspect Element (DevTools)
+Sub SimulateCtrlShiftC()
+    ' Press Ctrl + Shift + C
+    keybd_event VK_CONTROL, 0, 0, 0
+    keybd_event VK_SHIFT, 0, 0, 0
+    keybd_event VK_C, 0, 0, 0
+    
+    ' Release keys
+    keybd_event VK_C, 0, KEYEVENTF_KEYUP, 0
+    keybd_event VK_SHIFT, 0, KEYEVENTF_KEYUP, 0
+    keybd_event VK_CONTROL, 0, KEYEVENTF_KEYUP, 0
+End Sub
+
+' Simulate Ctrl + Shift + P for the Command Palette
+Sub SimulateCtrlShiftP()
+    ' Press Ctrl + Shift + P
+    keybd_event VK_CONTROL, 0, 0, 0
+    keybd_event VK_SHIFT, 0, 0, 0
+    keybd_event VK_P, 0, 0, 0
+    
+    ' Release keys
+    keybd_event VK_P, 0, KEYEVENTF_KEYUP, 0
+    keybd_event VK_SHIFT, 0, KEYEVENTF_KEYUP, 0
+    keybd_event VK_CONTROL, 0, KEYEVENTF_KEYUP, 0
+End Sub
+
+' Move the most recent downloaded file from the Downloads folder to the target folder and rename it
+Sub MoveMostRecentDownload(targetFolder As String, newFileName As String)
+    Dim fso As Object
+    Dim sourceFolder As String
+    Dim userName As String
+    Dim recentFile As Object
+    Dim recentFilePath As String
+    Dim destinationFile As String
+    Dim extension As String
+    
+    ' Get the user's username
+    userName = Environ("USERNAME")
+    
+    ' Define the Downloads folder path
+    sourceFolder = "C:\Users\" & userName & "\Downloads\"
+    
+    ' Create a FileSystemObject
+    Set fso = CreateObject("Scripting.FileSystemObject")
+    
+    ' Get the most recent file from the Downloads folder
+    Set recentFile = GetMostRecentFile(sourceFolder)
+    
+    If Not recentFile Is Nothing Then
+        ' Move the most recent file to the target folder
+        recentFilePath = recentFile.Path
+        extension = fso.GetExtensionName(recentFilePath)
+        newFileName = Replace(newFileName, " ", "_") & "." & extension
+        destinationFile = targetFolder & "\" & newFileName
+        
+        ' If the file already exists, append a timestamp or increment
+        If fso.FileExists(destinationFile) Then
+            newFileName = GenerateUniqueFileName(targetFolder, newFileName)
+            destinationFile = targetFolder & "\" & newFileName
+        End If
+        
+        ' Move and rename the file
+        fso.MoveFile recentFilePath, destinationFile
+    End If
+End Sub
+
+' Get the most recent file from the specified folder
+Function GetMostRecentFile(folderPath As String) As Object
+    Dim fso As Object
+    Dim folder As Object
+    Dim file As Object
+    Dim recentFile As Object
+    Dim mostRecentDate As Date
+    
+    ' Create a FileSystemObject
+    Set fso = CreateObject("Scripting.FileSystemObject")
+    
+    ' Get the folder object
+    Set folder = fso.GetFolder(folderPath)
+    
+    ' Loop through the files in the folder to find the most recent one
+    mostRecentDate = #1/1/1900# ' Initialize to a very old date
+    For Each file In folder.Files
+        If file.DateLastModified > mostRecentDate Then
+            Set recentFile = file
+            mostRecentDate = file.DateLastModified
+        End If
+    Next file
+    
+    ' Return the most recent file found
+    Set GetMostRecentFile = recentFile
+End Function
+
+' Generate a unique file name if a file with the same name already exists
+Function GenerateUniqueFileName(targetFolder As String, originalFileName As String) As String
+    Dim fso As Object
+    Dim baseName As String
+    Dim extension As String
+    Dim fileName As String
+    Dim counter As Integer
+    Dim timeStamp As String
+    
+    ' Create a FileSystemObject
+    Set fso = CreateObject("Scripting.FileSystemObject")
+    
+    ' Separate the base name and the extension
+    baseName = fso.GetBaseName(originalFileName)
+    extension = fso.GetExtensionName(originalFileName)
+    
+    ' Add a timestamp to create a unique name
+    timeStamp = Format(Now, "yyyymmdd_hhnnss")
+    fileName = baseName & "_" & timeStamp & "." & extension
+    
+    ' Ensure the new file name doesn't already exist
+    Do While fso.FileExists(targetFolder & "\" & fileName)
+        counter = counter + 1
+        fileName = baseName & "_" & timeStamp & "_" & counter & "." & extension
+    Loop
+    
+    ' Return the unique file name
+    GenerateUniqueFileName = fileName
+End Function
