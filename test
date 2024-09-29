@@ -1,0 +1,19 @@
+Option Explicit
+
+' Use Shell to open the default Chrome without extra debugging options
+
+Sub OpenDefaultChromeAndSearch()
+    Dim searchURL As String
+    Dim chromePath As String
+    
+    ' Define the search URL
+    searchURL = "https://www.google.com/search?q=Virat+Kohli"
+    
+    ' Default Chrome path (ensure this is the correct installation path)
+    chromePath = """C:\Program Files (x86)\Google\Chrome\Application\chrome.exe"""
+    
+    ' Open Chrome with the search URL
+    Shell chromePath & " " & searchURL, vbNormalFocus
+End Sub
+
+
