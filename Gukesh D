@@ -2,15 +2,16 @@ Option Explicit
 
 ' Windows API declarations for keyboard events and other required functions
 Private Declare PtrSafe Sub keybd_event Lib "user32" (ByVal bVk As Byte, ByVal bScan As Byte, ByVal dwFlags As Long, ByVal dwExtraInfo As Long)
-Private Declare PtrSafe Function FindWindow Lib "user32" Alias "FindWindowA" (ByVal lpClassName As String, ByVal lpWindowName As String) As LongPtr
+Private Declare PtrSafe Function FindWindowA Lib "user32" (ByVal lpClassName As String, ByVal lpWindowName As String) As LongPtr
 Private Declare PtrSafe Function SetForegroundWindow Lib "user32" (ByVal hwnd As LongPtr) As Long
-Private Declare PtrSafe Function ShowWindow Lib "user32" (ByVal hwnd As LongPtr, ByVal nCmdShow As Long)
+Private Declare PtrSafe Function ShowWindow Lib "user32" (ByVal hwnd As LongPtr, ByVal nCmdShow As Long) As Long
 Private Declare PtrSafe Sub Sleep Lib "kernel32" (ByVal dwMilliseconds As Long)
 
 ' Constants
 Private Const SW_MAXIMIZE As Long = 3
 Private Const VK_CONTROL As Byte = &H11
 Private Const VK_P As Byte = &H50
+Private Const VK_TAB As Byte = &H9
 Private Const VK_RETURN As Byte = &HD
 Private Const KEYEVENTF_KEYUP As Long = &H2
 
@@ -23,13 +24,16 @@ Sub OpenChromeAndPrint()
     Dim i As Long
     Dim xlApp As Object
     Dim xlBook As Object
+    Dim filePath As String
+
+    filePath = ThisWorkbook.FullName
 
     ' Open the Excel file (.xlsm)
     Set xlApp = CreateObject("Excel.Application")
-    Set xlBook = xlApp.Workbooks.Open("C:\Users\DELL\Desktop\ExcelVBA.xlsm")
+    Set xlBook = xlApp.Workbooks.Open(filePath)
     Set ws = xlBook.Sheets(1) ' Assuming data is in the first sheet
-
-    ' Find the last row with data in column A
+    
+    ' Find the last row with valid data in column A
     lastRow = ws.Cells(ws.Rows.Count, "A").End(xlUp).Row
 
     ' Define the download path where files will be saved
@@ -42,41 +46,41 @@ Sub OpenChromeAndPrint()
 
     ' Iterate through all names in column A
     For i = 1 To lastRow
-        name = ws.Cells(i, 1).value
-
+        name = ws.Cells(i, 1).Value
+        
         ' Open Chrome
-        hwnd = FindWindow("Chrome_WidgetWin_1", vbNullString)
-
-        ' If Chrome is found, bring it to the foreground and maximize it
+        hwnd = FindWindowA("Chrome_WidgetWin_1", vbNullString)
         If hwnd <> 0 Then
+            ' If Chrome is found, bring it to the foreground and maximize it
             ShowWindow hwnd, SW_MAXIMIZE
             SetForegroundWindow hwnd
             Sleep 2000 ' Wait for Chrome to be maximized
-
+            
             ' Navigate to Google search
-            SendKeys "^l", True ' Focus on the address bar
-            Sleep 1000
+            SendKeys "^t", True ' Focus on the address bar
+            Sleep 2000
             SendKeys "https://www.google.com/search?q=" & Replace(name, " ", "+"), True
-            Sleep 1000
+            Sleep 3000
             keybd_event VK_RETURN, 0, 0, 0 ' Press Enter
             keybd_event VK_RETURN, 0, KEYEVENTF_KEYUP, 0
             Sleep 5000 ' Wait for the search results to load
+            
+            ' Simulate pressing Tab twice and Enter to submit the form
+            SimulateTabTabEnter
+            
+            Sleep 5000 ' Wait for the search results to load again
 
             ' Simulate Ctrl + P to open Print dialog
             SimulateCtrlP
-            Sleep 3000 ' Allow time for the Print dialog to open
-            
-            keybd_event VK_RETURN, 0, 0, 0 ' Press Enter
-            keybd_event VK_RETURN, 0, KEYEVENTF_KEYUP, 0
-            Sleep 5000 ' Wait for the search results to load
-            
+
+            Sleep 5000 ' Allow time for the Print dialog to open
+
             ' Handle the Save As dialog
-            SaveFileDialog downloadPath & "\" & Replace(name, " ", "_") & ".pdf"
-            
+            SaveFileDialog downloadPath & "\" & Replace(name, " ", "-") & ".pdf"
+
             ' Wait for the file to be saved
             Sleep 5000
-
-            ' Move to the next search term, or end
+            
         Else
             MsgBox "Chrome window not found."
         End If
@@ -84,7 +88,7 @@ Sub OpenChromeAndPrint()
 
     ' Close the Excel workbook
     xlBook.Close False
-    xlApp.quit
+    xlApp.Quit
 
     ' Clean up
     Set xlBook = Nothing
@@ -99,17 +103,33 @@ Sub SimulateCtrlP()
     keybd_event VK_CONTROL, 0, KEYEVENTF_KEYUP, 0
 End Sub
 
+' Simulate pressing Tab twice and Enter to submit the form
+Sub SimulateTabTabEnter()
+    ' Simulate Tab key press
+    keybd_event VK_TAB, 0, 0, 0
+    keybd_event VK_TAB, 0, KEYEVENTF_KEYUP, 0
+    Sleep 500
+    
+    ' Simulate Tab key press again
+    keybd_event VK_TAB, 0, 0, 0
+    keybd_event VK_TAB, 0, KEYEVENTF_KEYUP, 0
+    Sleep 500
+    
+    ' Simulate Enter key press
+    keybd_event VK_RETURN, 0, 0, 0
+    keybd_event VK_RETURN, 0, KEYEVENTF_KEYUP, 0
+End Sub
+
 ' Handle Save As dialog to type the file name and press Enter
 Sub SaveFileDialog(fileName As String)
     ' Wait for the Save As dialog to appear
     Sleep 3000
-
+    
     ' Type the filename into the dialog box
     SendKeys fileName, True
-
+    
     ' Simulate pressing Enter to save the file
     Sleep 1000
     keybd_event VK_RETURN, 0, 0, 0
     keybd_event VK_RETURN, 0, KEYEVENTF_KEYUP, 0
 End Sub
-
