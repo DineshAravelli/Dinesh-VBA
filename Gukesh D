@@ -1,0 +1,17 @@
+' Simulate Ctrl + P to open Print dialog
+Sub SimulateCtrlPAndPrint()
+    ' Press Ctrl + P
+    keybd_event VK_CONTROL, 0, 0, 0
+    keybd_event VK_P, 0, 0, 0
+    
+    ' Release Ctrl + P keys
+    keybd_event VK_P, 0, KEYEVENTF_KEYUP, 0
+    keybd_event VK_CONTROL, 0, KEYEVENTF_KEYUP, 0
+    
+    ' Wait for the Print dialog to open
+    Application.Wait Now + TimeValue("00:00:02")
+    
+    ' Press Enter to print/save
+    keybd_event VK_RETURN, 0, 0, 0
+    keybd_event VK_RETURN, 0, KEYEVENTF_KEYUP, 0
+End Sub
