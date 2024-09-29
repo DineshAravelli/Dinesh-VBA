@@ -17,9 +17,7 @@ Private Const VK_RETURN As Byte = &HD
 
 Private Const KEYEVENTF_KEYUP = &H2
 
-Sub SearchViratKohliAndCaptureScreenshot()
-    Dim searchURL As String
-    Dim chromePath As String
+Sub FocusChromeAndCaptureScreenshot()
     Dim hwnd As LongPtr
     Dim downloadPath As String
     Dim name As String
@@ -33,22 +31,33 @@ Sub SearchViratKohliAndCaptureScreenshot()
         MkDir downloadPath
     End If
     
-    ' Open Chrome with the search URL for "Virat Kohli"
-    chromePath = """C:\Program Files (x86)\Google\Chrome\Application\chrome.exe""" ' Adjust path as needed
-    searchURL = "https://www.google.com/search?q=" & Replace(name, " ", "+")
-    
-    ' Launch Chrome and navigate to search page
-    Shell chromePath & " " & searchURL, vbNormalFocus
-    
-    ' Wait for Chrome to open
-    Application.Wait Now + TimeValue("00:00:05")
-    
-    ' Maximize the Chrome window (if needed)
+    ' Find the existing Chrome window by class name
     hwnd = FindWindow("Chrome_WidgetWin_1", vbNullString)
+    
+    ' If Chrome is found, bring it to the foreground and maximize it
     If hwnd <> 0 Then
         ShowWindow hwnd, SW_MAXIMIZE
         SetForegroundWindow hwnd
+    Else
+        MsgBox "Chrome window not found."
+        Exit Sub
     End If
+    
+    ' Wait for the window to become active
+    Application.Wait Now + TimeValue("00:00:02")
+    
+    ' Simulate Ctrl + L to focus the address bar and type the search term
+    SimulateCtrlL
+    Application.Wait Now + TimeValue("00:00:01")
+    SendKeys "https://www.google.com/search?q=" & Replace(name, " ", "+"), True
+    Application.Wait Now + TimeValue("00:00:01")
+    
+    ' Simulate pressing Enter to perform the search
+    keybd_event VK_RETURN, 0, 0, 0
+    keybd_event VK_RETURN, 0, KEYEVENTF_KEYUP, 0
+    
+    ' Wait for the search results to load
+    Application.Wait Now + TimeValue("00:00:05")
     
     ' Simulate Ctrl + Shift + C to open Inspect Element (DevTools)
     SimulateCtrlShiftC
@@ -79,6 +88,17 @@ Sub SearchViratKohliAndCaptureScreenshot()
     
     ' Move the most recent file from the Downloads folder to the specified folder and rename it based on the search query
     MoveMostRecentDownload downloadPath, name
+End Sub
+
+' Simulate Ctrl + L to focus the address bar
+Sub SimulateCtrlL()
+    ' Press Ctrl + L
+    keybd_event VK_CONTROL, 0, 0, 0
+    keybd_event 76, 0, 0, 0 ' L key
+    
+    ' Release keys
+    keybd_event 76, 0, KEYEVENTF_KEYUP, 0
+    keybd_event VK_CONTROL, 0, KEYEVENTF_KEYUP, 0
 End Sub
 
 ' Simulate Ctrl + Shift + C for Inspect Element (DevTools)
