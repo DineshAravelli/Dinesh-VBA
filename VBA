@@ -4,6 +4,9 @@ Option Explicit
 Private Declare PtrSafe Sub keybd_event Lib "user32" (ByVal bVk As Byte, ByVal bScan As Byte, ByVal dwFlags As Long, ByVal dwExtraInfo As Long)
 Private Declare PtrSafe Function FindWindow Lib "user32" Alias "FindWindowA" (ByVal lpClassName As String, ByVal lpWindowName As String) As LongPtr
 Private Declare PtrSafe Function SetForegroundWindow Lib "user32" (ByVal hwnd As LongPtr) As Long
+Private Declare PtrSafe Function ShowWindow Lib "user32" (ByVal hwnd As LongPtr, ByVal nCmdShow As Long) As Long
+
+Private Const SW_MAXIMIZE As Long = 3
 
 ' Virtual Key codes
 Private Const VK_CONTROL As Byte = &H11
@@ -14,18 +17,13 @@ Private Const VK_RETURN As Byte = &HD
 
 Private Const KEYEVENTF_KEYUP = &H2
 
-Sub CaptureScreenshotsFromExcelFile()
-    Dim chrome As New CDPBrowser
+Sub SearchViratKohliAndCaptureScreenshot()
     Dim searchURL As String
+    Dim chromePath As String
+    Dim hwnd As LongPtr
     Dim downloadPath As String
-    Dim wb As Workbook
-    Dim ws As Worksheet
     Dim name As String
-    Dim i As Integer
-    
-    ' Open the Excel file
-    Set wb = Workbooks.Open("C:\Users\DELL\Desktop\ExcelVBA.xlsm")
-    Set ws = wb.Sheets(1) ' Assuming the names are in the first sheet, adjust if necessary
+    name = "Virat Kohli" ' Define the search term
     
     ' Define the download path where screenshots will be saved
     downloadPath = "C:\Screenshots"
@@ -35,64 +33,51 @@ Sub CaptureScreenshotsFromExcelFile()
         MkDir downloadPath
     End If
     
-    ' Loop through names in column A, assuming names start in A1
-    For i = 1 To ws.Cells(Rows.Count, 1).End(xlUp).Row
-        name = ws.Cells(i, 1).value ' Get the name from column A
-        
-        ' Skip empty cells
-        If Trim(name) = "" Then GoTo NextName
-        
-        ' Start Chrome maximized with custom download path
-        chrome.start addArgs:="--disable-popup-blocking --window-position=0,0 --window-size=1920,1080 " & _
-                     "--disable-prompt-on-repost --no-default-browser-check --no-first-run --disable-translate " & _
-                     "--disable-extensions --safebrowsing-disable-download-protection --disable-popup-blocking " & _
-                     "--disable-infobars --disable-notifications --disable-save-password-bubble --disable-plugins " & _
-                     "--disable-print-preview --disable-web-security --user-data-dir=C:\Temp --disable-gpu " & _
-                     "--download.default_directory=" & downloadPath
-        
-        ' Define the search query based on the name
-        searchURL = "https://www.google.com/search?q=" & Replace(name, " ", "+")
-        
-        ' Navigate to the search page for the query
-        chrome.navigate searchURL
-        
-        ' Wait for the page to load
-        Application.wait Now + TimeValue("00:00:05")
-        
-        ' Simulate Ctrl + Shift + C to open Inspect Element
-        SimulateCtrlShiftC
-        
-        ' Wait for DevTools to open
-        Application.wait Now + TimeValue("00:00:05")
-        
-        ' Simulate Ctrl + Shift + P to open the command palette
-        SimulateCtrlShiftP
-        
-        ' Wait for the command palette to open
-        Application.wait Now + TimeValue("00:00:02")
-        
-        ' Type "Capture full size screenshot" in the command palette
-        sendKeys "capture full size screenshot", True
-        
-        ' Simulate pressing Enter to capture the screenshot
-        Application.wait Now + TimeValue("00:00:02")
-        keybd_event VK_RETURN, 0, 0, 0
-        keybd_event VK_RETURN, 0, KEYEVENTF_KEYUP, 0
-        
-        ' Move the most recent file from the Downloads folder to the specified folder and rename it based on the search query
-        MoveMostRecentDownload downloadPath, name
-        
-        ' Close Chrome after completion
-        chrome.quit
-        
-NextName:
-    Next i
+    ' Open Chrome with the search URL for "Virat Kohli"
+    chromePath = """C:\Program Files (x86)\Google\Chrome\Application\chrome.exe""" ' Adjust path as needed
+    searchURL = "https://www.google.com/search?q=" & Replace(name, " ", "+")
     
-    ' Close the workbook without saving
-    wb.Close False
+    ' Launch Chrome and navigate to search page
+    Shell chromePath & " " & searchURL, vbNormalFocus
+    
+    ' Wait for Chrome to open
+    Application.wait Now + TimeValue("00:00:05")
+    
+    ' Maximize the Chrome window (if needed)
+    hwnd = FindWindow("Chrome_WidgetWin_1", vbNullString)
+    If hwnd <> 0 Then
+        ShowWindow hwnd, SW_MAXIMIZE
+        SetForegroundWindow hwnd
+    End If
+    
+    ' Simulate Ctrl + Shift + C to open Inspect Element (DevTools)
+    SimulateCtrlShiftC
+    
+    ' Wait for DevTools to open
+    Application.wait Now + TimeValue("00:00:05")
+    
+    ' Simulate Ctrl + Shift + P to open the Command Palette
+    SimulateCtrlShiftP
+    
+    ' Wait for the Command Palette to open
+    Application.wait Now + TimeValue("00:00:02")
+    
+    ' Type "Capture full size screenshot" in the command palette
+    sendKeys "capture full size screenshot", True
+    
+    ' Simulate pressing Enter to capture the screenshot
+    Application.wait Now + TimeValue("00:00:02")
+    keybd_event VK_RETURN, 0, 0, 0
+    keybd_event VK_RETURN, 0, KEYEVENTF_KEYUP, 0
+    
+    ' Wait for the screenshot to be saved (delay before moving the file)
+    Application.wait Now + TimeValue("00:00:05")
+    
+    ' Move the most recent file from the Downloads folder to the specified folder and rename it based on the search query
+    MoveMostRecentDownload downloadPath, name
 End Sub
 
-' Simulate Ctrl + Shift + C for Inspect Element
+' Simulate Ctrl + Shift + C for Inspect Element (DevTools)
 Sub SimulateCtrlShiftC()
     ' Press Ctrl + Shift + C
     keybd_event VK_CONTROL, 0, 0, 0
@@ -214,5 +199,4 @@ Function GenerateUniqueFileName(targetFolder As String, originalFileName As Stri
     ' Return the unique file name
     GenerateUniqueFileName = fileName
 End Function
-
 
