@@ -1,225 +1,96 @@
 Option Explicit
 
-' Windows API declarations for keyboard events
-Private Declare PtrSafe Sub keybd_event Lib "user32" (ByVal bVk As Byte, ByVal bScan As Byte, ByVal dwFlags As Long, ByVal dwExtraInfo As Long)
-Private Declare PtrSafe Function FindWindow Lib "user32" Alias "FindWindowA" (ByVal lpClassName As String, ByVal lpWindowName As String) As LongPtr
+' References:
+' - Microsoft Scripting Runtime
+' - Microsoft XML, v6.0
+
 Private Declare PtrSafe Function SetForegroundWindow Lib "user32" (ByVal hwnd As LongPtr) As Long
 Private Declare PtrSafe Function ShowWindow Lib "user32" (ByVal hwnd As LongPtr, ByVal nCmdShow As Long) As Long
 
 Private Const SW_MAXIMIZE As Long = 3
 
-' Virtual Key codes
-Private Const VK_CONTROL As Byte = &H11
-Private Const VK_SHIFT As Byte = &H10
-Private Const VK_C As Byte = &H43
-Private Const VK_P As Byte = &H50
-Private Const VK_RETURN As Byte = &HD
-
-Private Const KEYEVENTF_KEYUP = &H2
-
-Sub FocusChromeAndCaptureScreenshot()
+Sub SearchAndClickUsingCDP()
+    Dim chromePath As String
     Dim hwnd As LongPtr
-    Dim downloadPath As String
-    Dim name As String
-    name = "Virat Kohli" ' Define the search term
+    Dim tabID As String
+    Dim searchURL As String
+    Dim buttonXPath As String
+
+    ' Path to the default Chrome installation
+    chromePath = """C:\Program Files (x86)\Google\Chrome\Application\chrome.exe"""
     
-    ' Define the download path where screenshots will be saved
-    downloadPath = "C:\Screenshots"
+    ' Define the search URL and button XPath
+    searchURL = "https://your-url-with-the-search-button" ' Use your actual URL here
+    buttonXPath = "//input[@type='submit' and @name='btnG']" ' XPath for the search button
     
-    ' Ensure folder exists or create it
-    If Dir(downloadPath, vbDirectory) = "" Then
-        MkDir downloadPath
-    End If
+    ' Launch Chrome with debugging enabled
+    Shell chromePath & " --remote-debugging-port=9222 --user-data-dir=""C:\ChromeAutomation"" --start-maximized", vbNormalFocus
     
-    ' Find the existing Chrome window by class name
-    hwnd = FindWindow("Chrome_WidgetWin_1", vbNullString)
-    
-    ' If Chrome is found, bring it to the foreground and maximize it
-    If hwnd <> 0 Then
-        ShowWindow hwnd, SW_MAXIMIZE
-        SetForegroundWindow hwnd
-    Else
-        MsgBox "Chrome window not found."
-        Exit Sub
-    End If
-    
-    ' Wait for the window to become active
-    Application.Wait Now + TimeValue("00:00:02")
-    
-    ' Simulate Ctrl + L to focus the address bar and type the search term
-    SimulateCtrlL
-    Application.Wait Now + TimeValue("00:00:01")
-    SendKeys "https://www.google.com/search?q=" & Replace(name, " ", "+"), True
-    Application.Wait Now + TimeValue("00:00:01")
-    
-    ' Simulate pressing Enter to perform the search
-    keybd_event VK_RETURN, 0, 0, 0
-    keybd_event VK_RETURN, 0, KEYEVENTF_KEYUP, 0
-    
-    ' Wait for the search results to load
+    ' Wait for Chrome to launch
     Application.Wait Now + TimeValue("00:00:05")
     
-    ' Simulate Ctrl + Shift + C to open Inspect Element (DevTools)
-    SimulateCtrlShiftC
+    ' Attach to the Chrome DevTools Protocol and open the specified URL
+    tabID = OpenNewTab(searchURL)
     
-    ' Wait for DevTools to open
+    ' Wait for the page to load
     Application.Wait Now + TimeValue("00:00:05")
     
-    ' Simulate Ctrl + Shift + P to open the Command Palette
-    SimulateCtrlShiftP
+    ' Use CDP to find and click the search button by XPath
+    ClickElementByXPath tabID, buttonXPath
     
-    ' Wait for the Command Palette to open
-    Application.Wait Now + TimeValue("00:00:02")
-    
-    ' Type "Capture full size screenshot" in the command palette
-    SendKeys "capture full size screenshot", True
-    
-    ' Simulate pressing Enter to capture the screenshot
-    Application.Wait Now + TimeValue("00:00:02")
-    keybd_event VK_RETURN, 0, 0, 0
-    keybd_event VK_RETURN, 0, KEYEVENTF_KEYUP, 0
-    
-    ' Wait for the screenshot to be saved (delay before moving the file)
-    Application.Wait Now + TimeValue("00:00:05")
-    
-    ' Automatically press Enter if "Save As" dialog appears
-    Application.Wait Now + TimeValue("00:00:03")
-    SendKeys "{ENTER}", True ' This will press Enter if the "Save As" dialog is open
-    
-    ' Move the most recent file from the Downloads folder to the specified folder and rename it based on the search query
-    MoveMostRecentDownload downloadPath, name
+    MsgBox "Search button clicked successfully!"
 End Sub
 
-' Simulate Ctrl + L to focus the address bar
-Sub SimulateCtrlL()
-    ' Press Ctrl + L
-    keybd_event VK_CONTROL, 0, 0, 0
-    keybd_event 76, 0, 0, 0 ' L key
+' Function to open a new tab and navigate to a URL using CDP
+Function OpenNewTab(url As String) As String
+    Dim http As Object
+    Dim jsonResponse As String
+    Dim tabID As String
     
-    ' Release keys
-    keybd_event 76, 0, KEYEVENTF_KEYUP, 0
-    keybd_event VK_CONTROL, 0, KEYEVENTF_KEYUP, 0
-End Sub
-
-' Simulate Ctrl + Shift + C for Inspect Element (DevTools)
-Sub SimulateCtrlShiftC()
-    ' Press Ctrl + Shift + C
-    keybd_event VK_CONTROL, 0, 0, 0
-    keybd_event VK_SHIFT, 0, 0, 0
-    keybd_event VK_C, 0, 0, 0
+    ' Create a new HTTP request to communicate with Chrome DevTools
+    Set http = CreateObject("MSXML2.ServerXMLHTTP.6.0")
+    http.Open "POST", "http://localhost:9222/json/new", False
+    http.setRequestHeader "Content-Type", "application/json"
+    http.send "{""url"":""" & url & """}"
     
-    ' Release keys
-    keybd_event VK_C, 0, KEYEVENTF_KEYUP, 0
-    keybd_event VK_SHIFT, 0, KEYEVENTF_KEYUP, 0
-    keybd_event VK_CONTROL, 0, KEYEVENTF_KEYUP, 0
-End Sub
-
-' Simulate Ctrl + Shift + P for the Command Palette
-Sub SimulateCtrlShiftP()
-    ' Press Ctrl + Shift + P
-    keybd_event VK_CONTROL, 0, 0, 0
-    keybd_event VK_SHIFT, 0, 0, 0
-    keybd_event VK_P, 0, 0, 0
+    ' Get the response which includes the tab ID
+    jsonResponse = http.responseText
     
-    ' Release keys
-    keybd_event VK_P, 0, KEYEVENTF_KEYUP, 0
-    keybd_event VK_SHIFT, 0, KEYEVENTF_KEYUP, 0
-    keybd_event VK_CONTROL, 0, KEYEVENTF_KEYUP, 0
-End Sub
-
-' Move the most recent downloaded file from the Downloads folder to the target folder and rename it
-Sub MoveMostRecentDownload(targetFolder As String, newFileName As String)
-    Dim fso As Object
-    Dim sourceFolder As String
-    Dim userName As String
-    Dim recentFile As Object
-    Dim recentFilePath As String
-    Dim destinationFile As String
-    Dim extension As String
+    ' Extract the tab ID from the JSON response
+    tabID = ExtractTabID(jsonResponse)
     
-    ' Get the user's username
-    userName = Environ("USERNAME")
-    
-    ' Define the Downloads folder path
-    sourceFolder = "C:\Users\" & userName & "\Downloads\"
-    
-    ' Create a FileSystemObject
-    Set fso = CreateObject("Scripting.FileSystemObject")
-    
-    ' Get the most recent file from the Downloads folder
-    Set recentFile = GetMostRecentFile(sourceFolder)
-    
-    If Not recentFile Is Nothing Then
-        ' Move the most recent file to the target folder
-        recentFilePath = recentFile.Path
-        extension = fso.GetExtensionName(recentFilePath)
-        newFileName = Replace(newFileName, " ", "_") & "." & extension
-        destinationFile = targetFolder & "\" & newFileName
-        
-        ' If the file already exists, append a timestamp or increment
-        If fso.FileExists(destinationFile) Then
-            newFileName = GenerateUniqueFileName(targetFolder, newFileName)
-            destinationFile = targetFolder & "\" & newFileName
-        End If
-        
-        ' Move and rename the file
-        fso.MoveFile recentFilePath, destinationFile
-    End If
-End Sub
-
-' Get the most recent file from the specified folder
-Function GetMostRecentFile(folderPath As String) As Object
-    Dim fso As Object
-    Dim folder As Object
-    Dim file As Object
-    Dim recentFile As Object
-    Dim mostRecentDate As Date
-    
-    ' Create a FileSystemObject
-    Set fso = CreateObject("Scripting.FileSystemObject")
-    
-    ' Get the folder object
-    Set folder = fso.GetFolder(folderPath)
-    
-    ' Loop through the files in the folder to find the most recent one
-    mostRecentDate = #1/1/1900# ' Initialize to a very old date
-    For Each file In folder.Files
-        If file.DateLastModified > mostRecentDate Then
-            Set recentFile = file
-            mostRecentDate = file.DateLastModified
-        End If
-    Next file
-    
-    ' Return the most recent file found
-    Set GetMostRecentFile = recentFile
+    ' Return the tab ID
+    OpenNewTab = tabID
 End Function
 
-' Generate a unique file name if a file with the same name already exists
-Function GenerateUniqueFileName(targetFolder As String, originalFileName As String) As String
-    Dim fso As Object
-    Dim baseName As String
-    Dim extension As String
-    Dim fileName As String
-    Dim counter As Integer
-    Dim timeStamp As String
+' Function to click an element using XPath via Chrome DevTools Protocol
+Sub ClickElementByXPath(tabID As String, xpath As String)
+    Dim http As Object
+    Dim command As String
+    Dim jsonResponse As String
     
-    ' Create a FileSystemObject
-    Set fso = CreateObject("Scripting.FileSystemObject")
+    ' Command to query the element by XPath and click it
+    command = "{""id"": 1, ""method"": ""Runtime.evaluate"", ""params"": {""expression"": ""document.evaluate('" & xpath & "', document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue.click();""}}"
     
-    ' Separate the base name and the extension
-    baseName = fso.GetBaseName(originalFileName)
-    extension = fso.GetExtensionName(originalFileName)
+    ' Send the command to Chrome DevTools
+    Set http = CreateObject("MSXML2.ServerXMLHTTP.6.0")
+    http.Open "POST", "http://localhost:9222/json/" & tabID, False
+    http.setRequestHeader "Content-Type", "application/json"
+    http.send command
     
-    ' Add a timestamp to create a unique name
-    timeStamp = Format(Now, "yyyymmdd_hhnnss")
-    fileName = baseName & "_" & timeStamp & "." & extension
+    ' Get the response from Chrome DevTools
+    jsonResponse = http.responseText
+End Sub
+
+' Function to extract tab ID from JSON response
+Function ExtractTabID(jsonResponse As String) As String
+    Dim startPos As Integer
+    Dim endPos As Integer
     
-    ' Ensure the new file name doesn't already exist
-    Do While fso.FileExists(targetFolder & "\" & fileName)
-        counter = counter + 1
-        fileName = baseName & "_" & timeStamp & "_" & counter & "." & extension
-    Loop
+    ' Find the "id" field in the JSON response
+    startPos = InStr(jsonResponse, """id"":""") + 6
+    endPos = InStr(startPos, jsonResponse, """")
     
-    ' Return the unique file name
-    GenerateUniqueFileName = fileName
+    ' Extract the tab ID
+    ExtractTabID = Mid(jsonResponse, startPos, endPos - startPos)
 End Function
