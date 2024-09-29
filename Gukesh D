@@ -11,18 +11,18 @@ Private Declare PtrSafe Sub Sleep Lib "kernel32" (ByVal dwMilliseconds As Long)
 Private Const SW_MAXIMIZE As Long = 3
 Private Const VK_CONTROL As Byte = &H11
 Private Const VK_P As Byte = &H50
-Private Const VK_TAB As Byte = &H09
 Private Const VK_RETURN As Byte = &HD
+Private Const VK_TAB As Byte = &H09
 Private Const KEYEVENTF_KEYUP As Long = &H2
 
-Sub SearchNamesAndPrint()
-    Dim wb As Workbook
-    Dim ws As Worksheet
-    Dim lastRow As Long
-    Dim searchName As String
-    Dim i As Long
+Sub OpenChromeAndPrint()
+    Dim name As String
     Dim downloadPath As String
+    Dim chromePath As String
     Dim hwnd As LongPtr
+
+    ' Define the Chrome executable path
+    chromePath = """C:\Program Files (x86)\Google\Chrome\Application\chrome.exe"""
 
     ' Define the download path where PDFs will be saved
     downloadPath = "C:\Screenshots"
@@ -32,14 +32,11 @@ Sub SearchNamesAndPrint()
         MkDir downloadPath
     End If
 
-    ' Open the workbook and worksheet
-    Set wb = Workbooks.Open("C:\Users\DELL\Desktop\ExcelVBA.xlsm")
-    Set ws = wb.Sheets(1) ' Assuming names are in the first sheet
+    ' Open Chrome freshly with a blank tab
+    Shell chromePath & " --new-window", vbNormalFocus
+    Sleep 5000 ' Wait for Chrome to launch
 
-    ' Get the last row with data in column A
-    lastRow = ws.Cells(ws.Rows.Count, "A").End(xlUp).Row
-
-    ' Open Chrome if it is not already opened
+    ' Find the window handle for Chrome (after opening)
     hwnd = FindWindow("Chrome_WidgetWin_1", vbNullString)
     
     ' If Chrome is found, bring it to the foreground and maximize it
@@ -47,24 +44,45 @@ Sub SearchNamesAndPrint()
         ShowWindow hwnd, SW_MAXIMIZE
         SetForegroundWindow hwnd
         Sleep 2000 ' Wait for Chrome to be maximized
+
+        ' Navigate to a fake search to avoid session restore
+        SendKeys "^l", True ' Focus on the address bar
+        Sleep 1000
+        SendKeys "https://www.google.com/search?q=person1", True ' Fake search
+        Sleep 1000
+        keybd_event VK_RETURN, 0, 0, 0 ' Press Enter to navigate
+        keybd_event VK_RETURN, 0, KEYEVENTF_KEYUP, 0
+        WaitForBrowserToRespond
+        Sleep 1000 ' Wait for the fake page to load
+
+        ' Close the fake tab
+        SendKeys "^w", True ' Close fake tab
+        Sleep 1000
+
+        ' Start the real searches using Excel
+        ProcessNamesFromExcel "C:\Users\DELL\Desktop\ExcelVBA.xlsm", downloadPath
+
+    Else
+        MsgBox "Chrome window not found."
     End If
+End Sub
 
-    ' Step 1: Perform a fake search to avoid restore session dialog
-    SendKeys "^t", True ' Open new tab
-    Sleep 1000
-    SendKeys "^l", True ' Focus address bar
-    Sleep 1000
-    SendKeys "https://www.google.com/search?q=person1", True ' Perform fake search
-    Sleep 1000
-    keybd_event VK_RETURN, 0, 0, 0 ' Press Enter to navigate
-    keybd_event VK_RETURN, 0, KEYEVENTF_KEYUP, 0
-    Sleep 5000 ' Wait for the fake page to load
+Sub ProcessNamesFromExcel(excelPath As String, downloadPath As String)
+    Dim wb As Workbook
+    Dim ws As Worksheet
+    Dim lastRow As Long
+    Dim searchName As String
+    Dim i As Long
+    Dim hwnd As LongPtr
 
-    ' Step 2: Close the fake tab
-    SendKeys "^w", True ' Close fake tab
-    Sleep 1000
+    ' Open the workbook and worksheet
+    Set wb = Workbooks.Open(excelPath)
+    Set ws = wb.Sheets(1) ' Assuming names are in the first sheet
 
-    ' Step 3: Loop through each real name in the Excel file
+    ' Get the last row with data in column A
+    lastRow = ws.Cells(ws.Rows.Count, "A").End(xlUp).Row
+
+    ' Loop through each name in the Excel file
     For i = 1 To lastRow
         searchName = ws.Cells(i, 1).Value
 
@@ -77,7 +95,7 @@ Sub SearchNamesAndPrint()
         Sleep 1000
         keybd_event VK_RETURN, 0, 0, 0 ' Press Enter to navigate
         keybd_event VK_RETURN, 0, KEYEVENTF_KEYUP, 0
-        Sleep 5000 ' Wait for the page to load
+        WaitForBrowserToRespond ' Wait until browser responds and page is loaded
 
         ' Simulate Tab key presses to navigate the website and hit Enter
         keybd_event VK_TAB, 0, 0, 0 ' First Tab
@@ -107,9 +125,25 @@ Sub SearchNamesAndPrint()
 
         ' Wait for the file to be saved
         Sleep 5000
+        
+        ' Close the current tab after printing is complete
+        SendKeys "^w", True ' Close tab
+        Sleep 1000
     Next i
 
     MsgBox "All searches completed!"
+End Sub
+
+' Wait for browser to respond
+Sub WaitForBrowserToRespond()
+    Dim hwnd As LongPtr
+    hwnd = FindWindow("Chrome_WidgetWin_1", vbNullString)
+    
+    ' Wait in a loop until the browser window is responding
+    Do While hwnd = 0
+        Sleep 1000 ' Wait for 1 second
+        hwnd = FindWindow("Chrome_WidgetWin_1", vbNullString) ' Recheck if the window is responding
+    Loop
 End Sub
 
 ' Handle Save As dialog to type the file name and press Enter
