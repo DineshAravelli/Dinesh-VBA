@@ -1,68 +1,218 @@
-Sub OpenEdgeAndTakeScreenshots()
-    Dim edgePath As String
-    Dim url As String
-    Dim psScript As String
-    Dim searchTerm As String
-    Dim windowTitle As String
-    Dim i As Integer
+Option Explicit
+
+' Windows API declarations for keyboard events
+Private Declare PtrSafe Sub keybd_event Lib "user32" (ByVal bVk As Byte, ByVal bScan As Byte, ByVal dwFlags As Long, ByVal dwExtraInfo As Long)
+Private Declare PtrSafe Function FindWindow Lib "user32" Alias "FindWindowA" (ByVal lpClassName As String, ByVal lpWindowName As String) As LongPtr
+Private Declare PtrSafe Function SetForegroundWindow Lib "user32" (ByVal hwnd As LongPtr) As Long
+
+' Virtual Key codes
+Private Const VK_CONTROL As Byte = &H11
+Private Const VK_SHIFT As Byte = &H10
+Private Const VK_C As Byte = &H43
+Private Const VK_P As Byte = &H50
+Private Const VK_RETURN As Byte = &HD
+
+Private Const KEYEVENTF_KEYUP = &H2
+
+Sub CaptureScreenshotsFromExcelFile()
+    Dim chrome As New CDPBrowser
+    Dim searchURL As String
+    Dim downloadPath As String
+    Dim wb As Workbook
     Dim ws As Worksheet
-
-    ' Set the worksheet
-    Set ws = ThisWorkbook.Sheets(1)  ' Assuming the names are in the first sheet
-
-    ' Path to Microsoft Edge
-    edgePath = """C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"""
-
-    ' Folder to save screenshots
-    Dim screenshotFolder As String
-    screenshotFolder = "C:\Screenshots\"
-    ' Ensure the folder exists
-    If Dir(screenshotFolder, vbDirectory) = "" Then
-        MkDir screenshotFolder
+    Dim name As String
+    Dim i As Integer
+    
+    ' Open the Excel file
+    Set wb = Workbooks.Open("C:\Users\DELL\Desktop\ExcelVBA.xlsm")
+    Set ws = wb.Sheets(1) ' Assuming the names are in the first sheet, adjust if necessary
+    
+    ' Define the download path where screenshots will be saved
+    downloadPath = "C:\Screenshots"
+    
+    ' Ensure folder exists or create it
+    If Dir(downloadPath, vbDirectory) = "" Then
+        MkDir downloadPath
     End If
-
-    ' Loop through cells A1 to A10 for names
-    For i = 1 To 10
-        searchTerm = ws.Cells(i, 1).Value  ' Read the search term from column 1
-        If Trim(searchTerm) = "" Then Exit For  ' Skip empty cells
-
-        ' Construct the URL for Google search
-        url = "https://www.google.com/search?q=" & Replace(searchTerm, " ", "+")
-
-        ' Start Edge and navigate to the URL
-        Shell edgePath & " --new-window " & url, vbNormalFocus
+    
+    ' Loop through names in column A, assuming names start in A1
+    For i = 1 To ws.Cells(Rows.Count, 1).End(xlUp).Row
+        name = ws.Cells(i, 1).value ' Get the name from column A
         
-        ' Wait for Edge to load
-        Application.Wait (Now + TimeValue("0:00:05"))
+        ' Skip empty cells
+        If Trim(name) = "" Then GoTo NextName
         
-        ' Construct the window title based on the search term
-        windowTitle = searchTerm & " - Google Search"
-
-        ' Try to activate the Edge window by exact title
-        On Error Resume Next
-        AppActivate windowTitle
-        If Err.Number <> 0 Then
-            MsgBox "Failed to activate Edge window. Error: " & Err.Description
-            Exit Sub
-        End If
-        On Error GoTo 0
-
-        ' PowerShell script to take a screenshot
-        psScript = "Add-Type -AssemblyName System.Windows.Forms;" & _
-                   "Add-Type -AssemblyName System.Drawing;" & _
-                   "$bounds = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds;" & _
-                   "$bitmap = New-Object System.Drawing.Bitmap $bounds.Width, $bounds.Height;" & _
-                   "$graphics = [System.Drawing.Graphics]::FromImage($bitmap);" & _
-                   "$graphics.CopyFromScreen($bounds.Location, [System.Drawing.Point]::Empty, $bounds.Size);" & _
-                   "$bitmap.Save('" & screenshotFolder & "screenshot_" & Replace(searchTerm, " ", "_") & ".png', [System.Drawing.Imaging.ImageFormat]::Png);" & _
-                   "$graphics.Dispose();" & _
-                   "$bitmap.Dispose();"
-
-        ' Run PowerShell script without showing the PowerShell window
-        Call Shell("powershell -windowstyle hidden -Command """ & psScript & """", vbNormalFocus)
-
-        ' Optional: pause between searches
-        Application.Wait (Now + TimeValue("0:00:05"))
+        ' Start Chrome maximized with custom download path
+        chrome.start addArgs:="--disable-popup-blocking --window-position=0,0 --window-size=1920,1080 " & _
+                     "--disable-prompt-on-repost --no-default-browser-check --no-first-run --disable-translate " & _
+                     "--disable-extensions --safebrowsing-disable-download-protection --disable-popup-blocking " & _
+                     "--disable-infobars --disable-notifications --disable-save-password-bubble --disable-plugins " & _
+                     "--disable-print-preview --disable-web-security --user-data-dir=C:\Temp --disable-gpu " & _
+                     "--download.default_directory=" & downloadPath
+        
+        ' Define the search query based on the name
+        searchURL = "https://www.google.com/search?q=" & Replace(name, " ", "+")
+        
+        ' Navigate to the search page for the query
+        chrome.navigate searchURL
+        
+        ' Wait for the page to load
+        Application.wait Now + TimeValue("00:00:05")
+        
+        ' Simulate Ctrl + Shift + C to open Inspect Element
+        SimulateCtrlShiftC
+        
+        ' Wait for DevTools to open
+        Application.wait Now + TimeValue("00:00:05")
+        
+        ' Simulate Ctrl + Shift + P to open the command palette
+        SimulateCtrlShiftP
+        
+        ' Wait for the command palette to open
+        Application.wait Now + TimeValue("00:00:02")
+        
+        ' Type "Capture full size screenshot" in the command palette
+        sendKeys "capture full size screenshot", True
+        
+        ' Simulate pressing Enter to capture the screenshot
+        Application.wait Now + TimeValue("00:00:02")
+        keybd_event VK_RETURN, 0, 0, 0
+        keybd_event VK_RETURN, 0, KEYEVENTF_KEYUP, 0
+        
+        ' Move the most recent file from the Downloads folder to the specified folder and rename it based on the search query
+        MoveMostRecentDownload downloadPath, name
+        
+        ' Close Chrome after completion
+        chrome.quit
+        
+NextName:
     Next i
+    
+    ' Close the workbook without saving
+    wb.Close False
 End Sub
+
+' Simulate Ctrl + Shift + C for Inspect Element
+Sub SimulateCtrlShiftC()
+    ' Press Ctrl + Shift + C
+    keybd_event VK_CONTROL, 0, 0, 0
+    keybd_event VK_SHIFT, 0, 0, 0
+    keybd_event VK_C, 0, 0, 0
+    
+    ' Release keys
+    keybd_event VK_C, 0, KEYEVENTF_KEYUP, 0
+    keybd_event VK_SHIFT, 0, KEYEVENTF_KEYUP, 0
+    keybd_event VK_CONTROL, 0, KEYEVENTF_KEYUP, 0
+End Sub
+
+' Simulate Ctrl + Shift + P for the Command Palette
+Sub SimulateCtrlShiftP()
+    ' Press Ctrl + Shift + P
+    keybd_event VK_CONTROL, 0, 0, 0
+    keybd_event VK_SHIFT, 0, 0, 0
+    keybd_event VK_P, 0, 0, 0
+    
+    ' Release keys
+    keybd_event VK_P, 0, KEYEVENTF_KEYUP, 0
+    keybd_event VK_SHIFT, 0, KEYEVENTF_KEYUP, 0
+    keybd_event VK_CONTROL, 0, KEYEVENTF_KEYUP, 0
+End Sub
+
+' Move the most recent downloaded file from the Downloads folder to the target folder and rename it
+Sub MoveMostRecentDownload(targetFolder As String, newFileName As String)
+    Dim fso As Object
+    Dim sourceFolder As String
+    Dim userName As String
+    Dim recentFile As Object
+    Dim recentFilePath As String
+    Dim destinationFile As String
+    Dim extension As String
+    
+    ' Get the user's username
+    userName = Environ("USERNAME")
+    
+    ' Define the Downloads folder path
+    sourceFolder = "C:\Users\" & userName & "\Downloads\"
+    
+    ' Create a FileSystemObject
+    Set fso = CreateObject("Scripting.FileSystemObject")
+    
+    ' Get the most recent file from the Downloads folder
+    Set recentFile = GetMostRecentFile(sourceFolder)
+    
+    If Not recentFile Is Nothing Then
+        ' Move the most recent file to the target folder
+        recentFilePath = recentFile.Path
+        extension = fso.GetExtensionName(recentFilePath)
+        newFileName = Replace(newFileName, " ", "_") & "." & extension
+        destinationFile = targetFolder & "\" & newFileName
+        
+        ' If the file already exists, append a timestamp or increment
+        If fso.FileExists(destinationFile) Then
+            newFileName = GenerateUniqueFileName(targetFolder, newFileName)
+            destinationFile = targetFolder & "\" & newFileName
+        End If
+        
+        ' Move and rename the file
+        fso.MoveFile recentFilePath, destinationFile
+    End If
+End Sub
+
+' Get the most recent file from the specified folder
+Function GetMostRecentFile(folderPath As String) As Object
+    Dim fso As Object
+    Dim folder As Object
+    Dim file As Object
+    Dim recentFile As Object
+    Dim mostRecentDate As Date
+    
+    ' Create a FileSystemObject
+    Set fso = CreateObject("Scripting.FileSystemObject")
+    
+    ' Get the folder object
+    Set folder = fso.GetFolder(folderPath)
+    
+    ' Loop through the files in the folder to find the most recent one
+    mostRecentDate = #1/1/1900# ' Initialize to a very old date
+    For Each file In folder.Files
+        If file.DateLastModified > mostRecentDate Then
+            Set recentFile = file
+            mostRecentDate = file.DateLastModified
+        End If
+    Next file
+    
+    ' Return the most recent file found
+    Set GetMostRecentFile = recentFile
+End Function
+
+' Generate a unique file name if a file with the same name already exists
+Function GenerateUniqueFileName(targetFolder As String, originalFileName As String) As String
+    Dim fso As Object
+    Dim baseName As String
+    Dim extension As String
+    Dim fileName As String
+    Dim counter As Integer
+    Dim timeStamp As String
+    
+    ' Create a FileSystemObject
+    Set fso = CreateObject("Scripting.FileSystemObject")
+    
+    ' Separate the base name and the extension
+    baseName = fso.GetBaseName(originalFileName)
+    extension = fso.GetExtensionName(originalFileName)
+    
+    ' Add a timestamp to create a unique name
+    timeStamp = Format(Now, "yyyymmdd_hhnnss")
+    fileName = baseName & "_" & timeStamp & "." & extension
+    
+    ' Ensure the new file name doesn't already exist
+    Do While fso.FileExists(targetFolder & "\" & fileName)
+        counter = counter + 1
+        fileName = baseName & "_" & timeStamp & "_" & counter & "." & extension
+    Loop
+    
+    ' Return the unique file name
+    GenerateUniqueFileName = fileName
+End Function
+
 
