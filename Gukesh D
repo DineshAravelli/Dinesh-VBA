@@ -48,7 +48,10 @@ Sub OpenChromeAndPrint()
     For i = 1 To lastRow
         name = ws.Cells(i, 1).Value
         
-        ' Open Chrome
+        ' Open a new instance of Chrome
+        Shell "C:\Program Files (x86)\Google\Chrome\Application\chrome.exe", vbNormalFocus
+        Sleep 3000 ' Give Chrome time to start
+        
         hwnd = FindWindowA("Chrome_WidgetWin_1", vbNullString)
         If hwnd <> 0 Then
             ' If Chrome is found, bring it to the foreground and maximize it
@@ -57,7 +60,7 @@ Sub OpenChromeAndPrint()
             Sleep 2000 ' Wait for Chrome to be maximized
             
             ' Navigate to Google search
-            SendKeys "^t", True ' Focus on the address bar
+            SendKeys "^t", True ' Open a new tab and focus on the address bar
             Sleep 2000
             SendKeys "https://www.google.com/search?q=" & Replace(name, " ", "+"), True
             Sleep 3000
@@ -73,14 +76,17 @@ Sub OpenChromeAndPrint()
             ' Simulate Ctrl + P to open Print dialog
             SimulateCtrlP
 
-            Sleep 5000 ' Allow time for the Print dialog to open
+            Sleep 10000 ' Allow more time for the Print dialog to open
 
             ' Handle the Save As dialog
             SaveFileDialog downloadPath & "\" & Replace(name, " ", "-") & ".pdf"
 
             ' Wait for the file to be saved
-            Sleep 5000
+            Sleep 7000
             
+            ' Close Chrome after saving
+            Shell "taskkill /F /IM chrome.exe", vbHide
+            Sleep 3000 ' Give time for Chrome to close before moving to next name
         Else
             MsgBox "Chrome window not found."
         End If
@@ -123,7 +129,7 @@ End Sub
 ' Handle Save As dialog to type the file name and press Enter
 Sub SaveFileDialog(fileName As String)
     ' Wait for the Save As dialog to appear
-    Sleep 3000
+    Sleep 5000 ' Increased delay for Save As dialog
     
     ' Type the filename into the dialog box
     SendKeys fileName, True
