@@ -41,7 +41,7 @@ Sub SearchViratKohliAndCaptureScreenshot()
     Shell chromePath & " " & searchURL, vbNormalFocus
     
     ' Wait for Chrome to open
-    Application.wait Now + TimeValue("00:00:05")
+    Application.Wait Now + TimeValue("00:00:05")
     
     ' Maximize the Chrome window (if needed)
     hwnd = FindWindow("Chrome_WidgetWin_1", vbNullString)
@@ -54,24 +54,28 @@ Sub SearchViratKohliAndCaptureScreenshot()
     SimulateCtrlShiftC
     
     ' Wait for DevTools to open
-    Application.wait Now + TimeValue("00:00:05")
+    Application.Wait Now + TimeValue("00:00:05")
     
     ' Simulate Ctrl + Shift + P to open the Command Palette
     SimulateCtrlShiftP
     
     ' Wait for the Command Palette to open
-    Application.wait Now + TimeValue("00:00:02")
+    Application.Wait Now + TimeValue("00:00:02")
     
     ' Type "Capture full size screenshot" in the command palette
-    sendKeys "capture full size screenshot", True
+    SendKeys "capture full size screenshot", True
     
     ' Simulate pressing Enter to capture the screenshot
-    Application.wait Now + TimeValue("00:00:02")
+    Application.Wait Now + TimeValue("00:00:02")
     keybd_event VK_RETURN, 0, 0, 0
     keybd_event VK_RETURN, 0, KEYEVENTF_KEYUP, 0
     
     ' Wait for the screenshot to be saved (delay before moving the file)
-    Application.wait Now + TimeValue("00:00:05")
+    Application.Wait Now + TimeValue("00:00:05")
+    
+    ' Automatically press Enter if "Save As" dialog appears
+    Application.Wait Now + TimeValue("00:00:03")
+    SendKeys "{ENTER}", True ' This will press Enter if the "Save As" dialog is open
     
     ' Move the most recent file from the Downloads folder to the specified folder and rename it based on the search query
     MoveMostRecentDownload downloadPath, name
@@ -199,4 +203,3 @@ Function GenerateUniqueFileName(targetFolder As String, originalFileName As Stri
     ' Return the unique file name
     GenerateUniqueFileName = fileName
 End Function
-
