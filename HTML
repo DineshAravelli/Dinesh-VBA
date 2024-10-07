@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Complete Website with Collapsible Sidebar</title>
+    <style>
+        /* Resetting basic styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            height: 100%;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+        }
+
+        /* Top Navigation Bar */
+        .top-nav {
+            background-color: #002244; /* Bank of America Blue */
+            color: white;
+            position: fixed;
+            top: 0;
+            width: 100%;
+            height: 40px; /* Reduced height */
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            z-index: 1;
+            padding: 0 20px;
+        }
+
+        .top-nav .nav-links {
+            display: flex;
+            justify-content: space-evenly;
+            flex-grow: 1;
+            padding-left: 20px;
+        }
+
+        .top-nav a {
+            --border-width: 0.1em;
+            --animation-speed: 0.3s;
+            --color: #ffffff;
+            --hover-border-color: #00aaff;
+            color: var(--color);
+            position: relative;
+            display: inline-block;
+            font-size: 1.2em;
+            text-transform: uppercase;
+            text-decoration: none;
+            padding: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .top-nav a:hover {
+            color: #ffffff;
+        }
+
+        .top-nav a::before,
+        .top-nav a::after {
+            content: '';
+            position: absolute;
+            width: 0;
+            height: 0;
+            background: transparent;
+            transition: all var(--animation-speed) ease;
+        }
+
+        .top-nav a::before {
+            top: 0;
+            left: 0;
+            height: 0;
+            width: 0;
+            border-top: var(--border-width) solid var(--hover-border-color);
+            border-left: var(--border-width) solid var(--hover-border-color);
+        }
+
+        .top-nav a::after {
+            bottom: 0;
+            right: 0;
+            height: 0;
+            width: 0;
+            border-bottom: var(--border-width) solid var(--hover-border-color);
+            border-right: var(--border-width) solid var(--hover-border-color);
+        }
+
+        .top-nav a:hover::before {
+            width: 100%;
+            height: 100%;
+            transition: width var(--animation-speed) ease, height var(--animation-speed) ease 0.2s;
+        }
+
+        .top-nav a:hover::after {
+            width: 100%;
+            height: 100%;
+            transition: width var(--animation-speed) ease 0.2s, height var(--animation-speed) ease;
+        }
+
+        .top-nav a:focus,
+        .top-nav a:hover {
+            background-color: transparent;
+            outline: none;
+        }
+
+        /* Hamburger menu */
+        .hamburger {
+            font-size: 1.5em;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+
+        /* Left Navigation Bar */
+        .left-nav {
+            background-color: #002244;
+            width: 200px; /* Expanded width */
+            height: calc(100% - 40px);
+            position: fixed;
+            top: 40px;
+            left: 0;
+            z-index: 1;
+            transition: all 0.3s ease;
+            overflow-y: auto;
+        }
+
+        /* Sidebar buttons */
+        .button-container {
+            display: block;
+            padding: 10px;
+        }
+
+        /* Sidebar Buttons */
+        .left-nav button {
+            display: flex;
+            align-items: center;
+            width: 90%;
+            padding: 10px;
+            margin: 10px auto;
+            background-color: #00509e;
+            color: white;
+            border: none;
+            border-radius: 20px;
+            text-align: center;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+            overflow: hidden;
+            justify-content: center;
+        }
+
+        .left-nav button span {
+            margin-left: 10px;
+            transition: all 0.3s ease;
+        }
+
+        /* Button hover effect */
+        .left-nav button:hover {
+            background-color: #0074cc;
+            transform: scale(1.1);
+            box-shadow: 0 5px 15px rgba(0, 116, 204, 0.4);
+        }
+
+        /* When the sidebar is collapsed */
+        .left-nav.collapsed button {
+            width: 40px;
+            border-radius: 50%;
+            text-align: center;
+            font-size: 12px;
+            white-space: nowrap;
+            overflow: hidden;
+            padding: 10px 0;
+        }
+
+        /* Hide the button text when collapsed */
+        .left-nav.collapsed button span {
+            display: none;
+        }
+
+        /* Bottom Bar */
+        .bottom-bar {
+            background-color: #002244;
+            color: white;
+            position: fixed;
+            bottom: 0;
+            width: 100%;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1;
+        }
+
+        /* Main Content Area with Rounded Corners */
+        .main-content {
+            padding: 20px;
+            margin-left: 220px; /* Shifted by default */
+            margin-top: 50px;
+            height: calc(100vh - 100px);
+            overflow-y: auto;
+            border-radius: 15px;
+            background-color: #fff;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        /* When sidebar is collapsed */
+        .main-content.collapsed {
+            margin-left: 70px;
+        }
+
+        /* Home Section */
+        .home-section {
+            display: flex;
+            align-items: center;
+            margin-bottom: 40px;
+            position: relative;
+            opacity: 0;
+            animation: slideInRight 0.7s ease forwards;
+            border-radius: 15px;
+        }
+
+        .home-section:nth-child(even) {
+            flex-direction: row-reverse;
+            animation: slideInLeft 0.7s ease forwards;
+        }
+
+        .home-text {
+            flex: 1;
+            margin: 20px;
+            padding: 20px;
+            background-color: #f4f4f4;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .home-section img {
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            margin-right: 20px;
+        }
+
+        /* Animations */
+        @keyframes slideInRight {
+            0% {
+                opacity: 0;
+                transform: translateX(100%);
+            }
+            100% {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        @keyframes slideInLeft {
+            0% {
+                opacity: 0;
+                transform: translateX(-100%);
+            }
+            100% {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        /* For collapsed sidebar */
+        .left-nav.collapsed {
+            width: 50px;
+        }
+
+        /* Shift content when sidebar is collapsed */
+        .main-content.collapsed {
+            margin-left: 70px;
+        }
+
+    </style>
+</head>
+<body>
+
+<!-- Top Navigation -->
+<div class="top-nav">
+    <span class="hamburger" onclick="toggleNav()">&#9776;</span> <!-- Hamburger icon on the left -->
+    <div class="nav-links">
+        <a href="#" onclick="loadContent('home')">Home</a>
+        <a href="#" onclick="loadContent('dashboard')">Dashboard</a>
+        <a href="#" onclick="loadContent('opsdashboards')">Ops Dashboards</a>
+        <a href="#" onclick="loadContent('testscripts')">Test Scripts</a>
+        <a href="#" onclick="loadContent('portfolio')">Portfolio</a>
+        <a href="#" onclick="loadContent('blog')">Blog</a>
+    </div>
+</div>
+
+<!-- Left Navigation with Toggle Button (expanded by default) -->
+<div class="left-nav expanded" id="leftNav">
+    <div class="button-container"> <!-- Wrapping buttons in a div for scrolling -->
+        <button><span>Button 1</span></button>
+        <button><span>Button 2</span></button>
+        <button><span>Button 3</span></button>
+        <button><span>Button 4</span></button>
+        <button><span>Button 5</span></button>
+        <button><span>Button 6</span></button>
+        <button><span>Button 7</span></button>
+        <button><span>Button 8</span></button>
+        <button><span>Button 9</span></button>
+        <button><span>Button 10</span></button>
+        <button><span>Button 11</span></button>
+        <button><span>Button 12</span></button>
+        <button><span>Button 13</span></button>
+        <button><span>Button 14</span></button>
+        <button><span>Button 15</span></button>
+        <button><span>Button 16</span></button>
+        <button><span>Button 17</span></button>
+        <button><span>Button 18</span></button>
+        <button><span>Button 19</span></button>
+        <button><span>Button 20</span></button>
+    </div>
+</div>
+
+<!-- Main Content -->
+<div class="main-content" id="dynamicContent">
+    <!-- Content will be dynamically loaded here -->
+</div>
+
+<!-- Bottom Bar -->
+<div class="bottom-bar">
+    <p>&copy; 2024 Complex Webpage Layout. All Rights Reserved.</p>
+</div>
+
+<script>
+    function loadContent(page) {
+        let content = '';
+        if (page === 'home') {
+            content = `
+                <h2>Home</h2>
+                <div class="home-section">
+                    <img src="https://via.placeholder.com/150" alt="Person 1">
+                    <div class="home-text">
+                        <h3>Person 1</h3>
+                        <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit.</p>
+                    </div>
+                </div>
+                <div class="home-section">
+                    <img src="https://via.placeholder.com/150" alt="Person 2">
+                    <div class="home-text">
+                        <h3>Person 2</h3>
+                        <p>Integer molestie augue vel laoreet lobortis.</p>
+                    </div>
+                </div>
+                <div class="home-section">
+                    <img src="https://via.placeholder.com/150" alt="Person 3">
+                    <div class="home-text">
+                        <h3>Person 3</h3>
+                        <p>Pellentesque habitant morbi tristique senectus et netus et malesuada fames ac turpis egestas.</p>
+                    </div>
+                </div>
+                <div class="home-section">
+                    <img src="https://via.placeholder.com/150" alt="Person 4">
+                    <div class="home-text">
+                        <h3>Person 4</h3>
+                        <p>Suspendisse commodo magna vitae sem tincidunt, in facilisis lectus vehicula.</p>
+                    </div>
+                </div>
+            `;
+        } else if (page === 'dashboard') {
+            content = '<h2>Dashboard</h2><p>Welcome to your dashboard!</p>';
+        } else if (page === 'opsdashboards') {
+            content = '<h2>Ops Dashboards</h2><p>Here are the operational dashboards we offer.</p>';
+        } else if (page === 'testscripts') {
+            content = '<h2>Test Scripts</h2><p>View and manage test scripts here.</p>';
+        } else if (page === 'portfolio') {
+            content = '<h2>Portfolio</h2><p>Here is a showcase of our projects.</p>';
+        }
+
+        document.getElementById('dynamicContent').innerHTML = content;
+    }
+
+    // Automatically load the Home section when the page first loads
+    document.addEventListener('DOMContentLoaded', function() {
+        loadContent('home');  // Load 'Home' by default
+    });
+
+    // Function to toggle the visibility of the sidebar
+    function toggleNav() {
+        const nav = document.getElementById('leftNav');
+        const content = document.querySelector('.main-content');
+        
+        if (nav.classList.contains('collapsed')) {
+            nav.classList.remove('collapsed');
+            content.classList.remove('collapsed');
+        } else {
+            nav.classList.add('collapsed');
+            content.classList.add('collapsed');
+        }
+    }
+</script>
+
+</body>
+</html>
